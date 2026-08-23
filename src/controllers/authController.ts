@@ -20,7 +20,7 @@ export const loginUser = async (
 
     const user = await userRepository.findUserByEmail(email);
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user || !(await bcrypt.compare(password, user.password || ""))) {
       const error: CustomError = new Error("Invalid email or password");
       error.statusCode = 401;
       return next(error);
