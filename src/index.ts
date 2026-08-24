@@ -11,6 +11,8 @@ const clientUrl = process.env.CLIENT_URL;
 
 app.use(cors({ origin: clientUrl, credentials: true }));
 app.use(express.json());
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
   res.send("Exam Hub API is working!");
