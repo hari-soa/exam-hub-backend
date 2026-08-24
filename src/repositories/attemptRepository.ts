@@ -1,9 +1,9 @@
-import { db } from "../configuration/database";
+import { pool } from "../configuration/database";
 
 export class AttemptRepository {
   static async hasAttempts(examId: string): Promise<boolean> {
     const query = `SELECT COUNT(*) FROM exam_attempts WHERE exam_id = $1`;
-    const result = await db.query(query, [examId]);
+    const result = await pool.query(query, [examId]);
     return parseInt(result.rows[0].count, 10) > 0;
   }
 
@@ -12,7 +12,7 @@ export class AttemptRepository {
     studentId: string,
   ): Promise<boolean> {
     const query = `SELECT id FROM exam_attempts WHERE exam_id = $1 AND student_id = $2`;
-    const result = await db.query(query, [examId, studentId]);
+    const result = await pool.query(query, [examId, studentId]);
     return result.rows.length > 0;
   }
 
@@ -27,7 +27,7 @@ export class AttemptRepository {
       VALUES ($1, $2, $3, $4)
       RETURNING id
     `;
-    const result = await db.query(query, [
+    const result = await pool.query(query, [
       examId,
       studentId,
       score,
@@ -46,6 +46,6 @@ export class AttemptRepository {
       INSERT INTO attempt_answers (attempt_id, question_id, choice_id, is_correct)
       VALUES ($1, $2, $3, $4)
     `;
-    await db.query(query, [attemptId, questionId, choiceId, isCorrect]);
+    await pool.query(query, [attemptId, questionId, choiceId, isCorrect]);
   }
 }
