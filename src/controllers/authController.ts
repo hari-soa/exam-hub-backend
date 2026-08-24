@@ -7,24 +7,24 @@ export const loginUser = async (
   req: Request,
   res: Response,
   next: NextFunction,
-): Promise<void> => {
+) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body; // identifier = email ou STD
 
-    if (!email || !password) {
-      const error: any = new Error("Email and password are required");
+    if (!identifier || !password) {
+      const error: any = new Error("Identifier and password are required");
       error.statusCode = 400;
       return next(error);
     }
 
-    const user = await userRepository.findUserByEmail(email);
+    const user = await userRepository.findUserByIdentifier(identifier);
 
     if (
       !user ||
-      !(await bcrypt.compare(password, user.password || "")) ||
-      user.is_active === false
+      !(await bcrypt.compare(password, user.password)) ||
+      !user.is_active
     ) {
-      const error: any = new Error("Invalid email or password");
+      const error: any = new Error("Invalid credentials or inactive account");
       error.statusCode = 401;
       return next(error);
     }
@@ -32,9 +32,8 @@ export const loginUser = async (
     const token = jwt.sign(
       {
         id: user.id,
-        email: user.email,
         role: user.role,
-        name: `${user.first_name} ${user.last_name}`,
+        mustChangePassword: user.must_change_password,
       },
       process.env.JWT_SECRET!,
       { expiresIn: "8h" },
@@ -44,10 +43,10 @@ export const loginUser = async (
       token,
       user: {
         id: user.id,
+        matricule: user.matricule,
         email: user.email,
         role: user.role,
-        first_name: user.first_name,
-        last_name: user.last_name,
+        must_change_password: user.must_change_password,
       },
     });
   } catch (error) {

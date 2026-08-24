@@ -1,18 +1,17 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-CREATE TABLE users (
-    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(36) PRIMARY KEY,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'student')),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    role VARCHAR(50) CHECK (role IN ('admin', 'student')) DEFAULT 'student',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE courses (
-    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    id VARCHAR(36) PRIMARY KEY,
     code VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -20,7 +19,7 @@ CREATE TABLE courses (
 );
 
 CREATE TABLE exams (
-    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    id VARCHAR(36) PRIMARY KEY,
     course_id VARCHAR(36) NOT NULL REFERENCES courses(id) ON DELETE RESTRICT,
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -30,7 +29,7 @@ CREATE TABLE exams (
 );
 
 CREATE TABLE questions (
-    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    id VARCHAR(36) PRIMARY KEY,
     exam_id VARCHAR(36) NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
     prompt TEXT NOT NULL,
     points INT NOT NULL CHECK (points > 0),
@@ -38,7 +37,7 @@ CREATE TABLE questions (
 );
 
 CREATE TABLE choices (
-    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    id VARCHAR(36) PRIMARY KEY,
     question_id VARCHAR(36) NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     text TEXT NOT NULL,
     is_correct BOOLEAN NOT NULL DEFAULT FALSE,
@@ -46,7 +45,7 @@ CREATE TABLE choices (
 );
 
 CREATE TABLE exam_attempts (
-    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    id VARCHAR(36) PRIMARY KEY,
     exam_id VARCHAR(36) NOT NULL REFERENCES exams(id) ON DELETE RESTRICT,
     student_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     score INT NOT NULL DEFAULT 0,
@@ -56,9 +55,16 @@ CREATE TABLE exam_attempts (
 );
 
 CREATE TABLE attempt_answers (
-    id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    id VARCHAR(36) PRIMARY KEY,
     attempt_id VARCHAR(36) NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
     question_id VARCHAR(36) NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     choice_id VARCHAR(36) REFERENCES choices(id) ON DELETE SET NULL,
     is_correct BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS matricule VARCHAR(50) UNIQUE,
+ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT true;
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_matricule ON users(matricule);
