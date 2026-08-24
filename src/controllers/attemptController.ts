@@ -1,13 +1,23 @@
 import { Request, Response, NextFunction } from "express";
 import * as attemptService from "../services/attemptService";
 
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    name?: string;
+  };
+}
+
 export const getAvailableExams = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const studentId = req.user!.id;
+    const authReq = req as AuthenticatedRequest;
+    const studentId = authReq.user!.id;
     const exams = await attemptService.getAvailableExamsForStudent(studentId);
     res.json(exams);
   } catch (error) {
