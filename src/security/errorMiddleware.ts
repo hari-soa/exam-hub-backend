@@ -1,27 +1,20 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: "admin" | "student";
-  };
-}
-
 export const errorHandler = (
   err: any,
   req: Request,
   res: Response,
   next: NextFunction,
 ): void => {
-  const statusCode = err.status || err.statusCode || 500;
-  const message = err.message || "Internal server error";
+  const statusCode = err.status;
+  const message = err.message;
 
   res.status(statusCode).json({ message });
 };
 
 export const authenticateToken = (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void => {
@@ -30,7 +23,6 @@ export const authenticateToken = (
     authHeader && authHeader.startsWith("Bearer ")
       ? authHeader.split(" ")[1]
       : null;
-
   if (!token) {
     res.status(401).json({ message: "Authentication token required" });
     return;
@@ -41,22 +33,19 @@ export const authenticateToken = (
       res.status(401).json({ message: "Invalid or expired token" });
       return;
     }
-
-    req.user = {
-      id: decoded.id,
-      role: decoded.role,
+    (req as any).user = {
+      id: (decoded as any).id,
+      role: (decoded as any).role,
     };
     next();
   });
 };
 
 export const requireRole = (role: "admin" | "student") => {
-  return (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction,
-  ): void => {
-    if (!req.user || req.user.role !== role) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const user = (req as any).user;
+
+    if (!user || user.role !== role) {
       res
         .status(403)
         .json({ message: "Access forbidden: Insufficient permissions" });
