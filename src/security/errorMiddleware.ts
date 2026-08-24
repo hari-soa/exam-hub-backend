@@ -7,7 +7,6 @@ export interface AuthenticatedRequest extends Request {
     role: "admin" | "student";
   };
 }
-
 export const errorHandler = (
   err: any,
   req: Request,
