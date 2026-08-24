@@ -6,8 +6,8 @@ import studentRoutes from "./routes/studentRoutes";
 import { errorHandler } from "./security/errorMiddleware";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+const PORT = process.env.PORT;
+const clientUrl = process.env.CLIENT_URL;
 
 app.use(cors({ origin: clientUrl, credentials: true }));
 app.use(express.json());
