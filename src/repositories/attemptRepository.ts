@@ -1,51 +1,61 @@
+import { PoolClient } from "pg";
 import { pool } from "../configuration/database";
+import { ExamAttempt } from "../models/userModel";
 
-export class AttemptRepository {
-  static async hasAttempts(examId: string): Promise<boolean> {
-    const query = `SELECT COUNT(*) FROM exam_attempts WHERE exam_id = $1`;
-    const result = await pool.query(query, [examId]);
-    return parseInt(result.rows[0].count, 10) > 0;
-  }
+export const AttemptRepository = {
+    async findByStudentAndExam(studentId: string, examId: string): Promise<ExamAttempt | null> {
+        const { rows } = await pool.query<ExamAttempt>(
+            "SELECT * FROM attempts WHERE student_id = $1 AND exam_id = $2",
+            [studentId, examId]
+        );
+        return rows[0] || null;
+    },
 
-  static async hasStudentAttempted(
-    examId: string,
-    studentId: string,
-  ): Promise<boolean> {
-    const query = `SELECT id FROM exam_attempts WHERE exam_id = $1 AND student_id = $2`;
-    const result = await pool.query(query, [examId, studentId]);
-    return result.rows.length > 0;
-  }
+    async findById(id: string): Promise<ExamAttempt | null> {
+        const { rows } = await pool.query<ExamAttempt>(
+            "SELECT * FROM attempts WHERE id = $1",
+            [id]
+        );
+        return rows[0] || null;
+    },
 
-  static async createAttempt(
-    examId: string,
-    studentId: string,
-    score: number,
-    totalPoints: number,
-  ): Promise<string> {
-    const query = `
-      INSERT INTO exam_attempts (exam_id, student_id, score, total_points)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id
-    `;
-    const result = await pool.query(query, [
-      examId,
-      studentId,
-      score,
-      totalPoints,
-    ]);
-    return result.rows[0].id;
-  }
+    async findByExamId(examId: string): Promise<ExamAttempt[]> {
+        const { rows } = await pool.query<ExamAttempt>(
+            "SELECT * FROM attempts WHERE exam_id = $1 ORDER BY submitted_at DESC",
+            [examId]
+        );
+        return rows;
+    },
 
-  static async recordAnswer(
-    attemptId: string,
-    questionId: string,
-    choiceId: string | null,
-    isCorrect: boolean,
-  ): Promise<void> {
-    const query = `
-      INSERT INTO attempt_answers (attempt_id, question_id, choice_id, is_correct)
-      VALUES ($1, $2, $3, $4)
-    `;
-    await pool.query(query, [attemptId, questionId, choiceId, isCorrect]);
-  }
-}
+    async findByStudentId(studentId: string): Promise<ExamAttempt[]> {
+        const { rows } = await pool.query<ExamAttempt>(
+            "SELECT * FROM attempts WHERE student_id = $1 ORDER BY submitted_at DESC",
+            [studentId]
+        );
+        return rows;
+    },
+
+    async existsForExam(examId: string): Promise<boolean> {
+        const { rows } = await pool.query<{ count: string }>(
+            "SELECT COUNT(*)::text AS count FROM attempts WHERE exam_id = $1",
+            [examId]
+        );
+        return parseInt(rows[0].count, 10) > 0;
+    },
+
+    async create(
+        client: PoolClient,
+        studentId: string,
+        examId: string,
+        score: number,
+        totalPoints: number
+    ): Promise<ExamAttempt> {
+        const { rows } = await client.query<ExamAttempt>(
+            `INSERT INTO attempts (student_id, exam_id, score, total_points)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
+            [studentId, examId, score, totalPoints]
+        );
+        return rows[0];
+    },
+};
