@@ -11,6 +11,14 @@ export const findUserByEmail = async (
   return result.rows[0];
 };
 
+export const findUserByIdentifier = async (identifier: string) => {
+  const result = await pool.query(
+    `SELECT * FROM users WHERE email = $1 OR matricule = $1`,
+    [identifier],
+  );
+  return result.rows[0] || null;
+};
+
 export const findUserById = async (id: string): Promise<User | undefined> => {
   const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
   return result.rows[0];
