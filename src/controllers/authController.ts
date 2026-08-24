@@ -2,26 +2,29 @@ import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import * as userRepository from "../repositories/userRepository";
-import { CustomError } from "../middlewares/errorMiddleware";
 
 export const loginUser = async (
   req: Request,
   res: Response,
   next: NextFunction,
-) => {
+): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      const error: CustomError = new Error("Email and password are required");
+      const error: any = new Error("Email and password are required");
       error.statusCode = 400;
       return next(error);
     }
 
     const user = await userRepository.findUserByEmail(email);
 
-    if (!user || !(await bcrypt.compare(password, user.password || ""))) {
-      const error: CustomError = new Error("Invalid email or password");
+    if (
+      !user ||
+      !(await bcrypt.compare(password, user.password || "")) ||
+      user.is_active === false
+    ) {
+      const error: any = new Error("Invalid email or password");
       error.statusCode = 401;
       return next(error);
     }
