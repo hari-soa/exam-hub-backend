@@ -1,66 +1,184 @@
-import { Question, Choice } from "../models/userModel";
+import { pool } from "../configuration/database";
+import { ExamRepository } from "../repositories/examRepository";
+import { QuestionRepository } from "../repositories/questionRepository";
+import { ChoiceRepository } from "../repositories/choiceRepository";
+import { AttemptRepository } from "../repositories/attemptRepository";
+import { AnswerRepository } from "../repositories/answerRepository";
+import { ApiError } from "../middlewares/ApiError";
+import { Exam, Question, Choice } from "../models/userModel";
+import { gradeExam, SubmittedAnswer } from "./studentExamService";
 
-export interface SubmittedAnswer {
-    question_id: string;
-    choice_id: string | null;
-}
-
-export interface GradedQuestion {
-    question_id: string;
+export interface QuestionForStudent {
+    id: string;
     prompt: string;
     points: number;
-    selected_choice_id: string | null;
-    correct_choice_id: string;
-    is_correct: boolean;
-    points_earned: number;
-    choices: { id: string; text: string; is_correct?: boolean }[];
+    choices: Omit<Choice, "is_correct">[];
 }
 
-export interface GradingResult {
-    score: number;
-    total_points: number;
-    details: GradedQuestion[];
+export interface ExamForStudent {
+    exam: Exam;
+    questions: QuestionForStudent[];
 }
 
-export function gradeExam(
-    questions: Question[],
-    choicesByQuestion: Map<string, Choice[]>,
-    submittedAnswers: SubmittedAnswer[]
-): GradingResult {
-    const answerMap = new Map<string, string | null>();
-    for (const a of submittedAnswers) {
-        answerMap.set(a.question_id, a.choice_id);
-    }
+function isWindowOpen(exam: Exam): boolean {
+    const now = new Date();
+    return now >= new Date(exam.start_date) && now <= new Date(exam.end_date);
+}
 
-    let score = 0;
-    let totalPoints = 0;
-    const details: GradedQuestion[] = [];
+export const ExamTakingService = {
+    async listAvailable(studentId: string): Promise<Exam[]> {
+        const exams = await ExamRepository.findAll();
+        const availableExams: Exam[] = [];
 
-    for (const q of questions) {
-        totalPoints += Number(q.points);
-        const choices = choicesByQuestion.get(q.id) || [];
-        const correctChoice = choices.find((c) => c.is_correct);
+        for (const exam of exams) {
+            if (isWindowOpen(exam)) {
+                const alreadyTaken = await AttemptRepository.findByStudentAndExam(studentId, exam.id);
+                if (!alreadyTaken) {
+                    availableExams.push(exam);
+                }
+            }
+        }
 
-        const selectedChoiceId = answerMap.has(q.id) ? answerMap.get(q.id) ?? null : null;
-        const selectedIsValid =
-            selectedChoiceId !== null && choices.some((c) => c.id === selectedChoiceId);
+        return availableExams;
+    },
 
-        const isCorrect =
-            selectedIsValid && correctChoice !== undefined && selectedChoiceId === correctChoice.id;
-        const pointsEarned = isCorrect ? Number(q.points) : 0;
-        score += pointsEarned;
+    async getExamForStudent(studentId: string, examId: string): Promise<ExamForStudent> {
+        const exam = await ExamRepository.findByIdWithQuestions(examId);
+        if (!exam) throw ApiError.notFound("Exam not found");
 
-        details.push({
-            question_id: q.id,
+        if (!isWindowOpen(exam)) {
+            throw ApiError.forbidden("This exam is not available at the moment");
+        }
+
+        const already = await AttemptRepository.findByStudentAndExam(studentId, examId);
+        if (already) {
+            throw ApiError.conflict("You have already taken this exam");
+        }
+
+   
+        const rawQuestions = await QuestionRepository.findByExamId(Number(examId));
+        const questions = rawQuestions.map((q: any) => ({
+            id: String(q.id),
+            exam_id: String(q.exam_id),
+            prompt: q.prompt || q.statement,
+            points: Number(q.points),
+        }));
+
+        const questionIds = questions.map((q) => q.id);
+        const rawChoices = await ChoiceRepository.findByQuestionIds(questionIds);
+        const choices: Choice[] = rawChoices.map((c: any) => ({
+            id: String(c.id),
+            question_id: String(c.question_id),
+            text: c.text || c.label,
+            is_correct: Boolean(c.is_correct),
+        }));
+
+        const questionsForStudent: QuestionForStudent[] = questions.map((q) => ({
+            id: q.id,
             prompt: q.prompt,
             points: Number(q.points),
-            selected_choice_id: selectedIsValid ? selectedChoiceId : null,
-            correct_choice_id: correctChoice ? correctChoice.id : "",
-            is_correct: isCorrect,
-            points_earned: pointsEarned,
-            choices: choices.map((c) => ({ id: c.id, text: c.text, is_correct: c.is_correct })),
-        });
-    }
+            choices: choices
+                .filter((c) => c.question_id === q.id)
+                .map(({ is_correct, ...rest }) => rest),
+        }));
 
-    return { score, total_points: totalPoints, details };
-}
+        return { exam, questions: questionsForStudent };
+    },
+
+    async submit(studentId: string, examId: string, answers: SubmittedAnswer[]) {
+        const exam = await ExamRepository.findByIdWithQuestions(examId);
+        if (!exam) throw ApiError.notFound("Exam not found");
+
+        if (!isWindowOpen(exam)) {
+            throw ApiError.forbidden("The availability window for this exam is closed");
+        }
+
+        const already = await AttemptRepository.findByStudentAndExam(studentId, examId);
+        if (already) {
+            throw ApiError.conflict("You have already taken this exam");
+        }
+
+        if (!Array.isArray(answers)) {
+            throw ApiError.badRequest("Invalid answers format");
+        }
+
+   
+        const rawQuestions = await QuestionRepository.findByExamId(Number(examId));
+        if (rawQuestions.length === 0) {
+            throw ApiError.conflict("This exam contains no questions");
+        }
+
+        const questions: Question[] = rawQuestions.map((q: any) => ({
+            id: String(q.id),
+            exam_id: String(q.exam_id),
+            prompt: q.prompt || q.statement,
+            points: Number(q.points),
+            choices: [],
+        }));
+
+        const questionIds = questions.map((q) => q.id);
+        const rawChoices = await ChoiceRepository.findByQuestionIds(questionIds);
+        const allChoices: Choice[] = rawChoices.map((c: any) => ({
+            id: String(c.id),
+            question_id: String(c.question_id),
+            text: c.text || c.label,
+            is_correct: Boolean(c.is_correct),
+        }));
+
+        const choicesByQuestion = new Map<string, Choice[]>();
+        for (const q of questions) {
+            choicesByQuestion.set(
+                q.id,
+                allChoices.filter((c) => c.question_id === q.id)
+            );
+        }
+
+        const validQuestionIds = new Set(questions.map((q) => q.id));
+        const sanitizedAnswers: SubmittedAnswer[] = answers
+            .filter((a) => a && validQuestionIds.has(String(a.question_id)))
+            .map((a) => ({
+                question_id: String(a.question_id),
+                choice_id: a.choice_id === null || a.choice_id === undefined ? null : String(a.choice_id),
+            }));
+
+        const grading = gradeExam(questions, choicesByQuestion, sanitizedAnswers);
+
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+
+            const attempt = await AttemptRepository.create(
+                client,
+                studentId,
+                examId,
+                grading.score,
+                grading.total_points
+            );
+
+            for (const detail of grading.details) {
+                await AnswerRepository.create(
+                    client,
+                    attempt.id,
+                    detail.question_id,
+                    detail.selected_choice_id
+                );
+            }
+
+            await client.query("COMMIT");
+
+            return {
+                attempt_id: attempt.id,
+                exam_id: examId,
+                score: grading.score,
+                total_points: grading.total_points,
+                submitted_at: attempt.submitted_at,
+                details: grading.details,
+            };
+        } catch (err) {
+            await client.query("ROLLBACK");
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
+};

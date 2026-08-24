@@ -3,16 +3,20 @@ import { AttemptRepository } from "../repositories/attemptRepository";
 import { QuestionRepository } from "../repositories/questionRepository";
 import { ChoiceRepository } from "../repositories/choiceRepository";
 import { AnswerRepository } from "../repositories/answerRepository";
+import { pool } from "../configuration/database";
 
 export const StudentHistoryService = {
+
     async getStudentHistory(studentId: string) {
         const attempts = await AttemptRepository.findByStudentId(studentId);
         if (attempts.length === 0) return [];
 
         const results = [];
         for (const attempt of attempts) {
-            const exam = await ExamRepository.findByIdWithQuestions(attempt.exam_id);
-            const rawQuestions = await QuestionRepository.findByExamId(Number(attempt.exam_id));
+            const examId = String(attempt.exam_id);
+            const examIdNumber = Number(examId);
+            const exam = await ExamRepository.findByIdWithQuestions(examId);
+            const rawQuestions = await QuestionRepository.findByExamId(examIdNumber);
             const questions = rawQuestions.map((q: any) => ({
                 id: String(q.id),
                 prompt: q.prompt || q.statement,
@@ -62,4 +66,29 @@ export const StudentHistoryService = {
 
         return results;
     },
+
+
+    async getExamResults(examId: string) {
+        const query = `
+            SELECT 
+                a.id AS attempt_id,
+                a.exam_id,
+                a.student_id,
+                a.score,
+                a.total_points,
+                a.submitted_at,
+                u.first_name,
+                u.last_name,
+                u.email
+            FROM exam_attempts a
+            JOIN users u ON a.student_id = u.id
+            WHERE a.exam_id = $1
+            ORDER BY a.submitted_at DESC;
+        `;
+        const { rows } = await pool.query(query, [examId]);
+        return rows;
+    },
 };
+
+
+export const ResultsService = StudentHistoryService;

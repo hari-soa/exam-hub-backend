@@ -1,5 +1,5 @@
 import { pool } from "../configuration/database";
-import { Question } from "../models/Question";
+import { Question } from "../models/userModel";
 
 export const QuestionRepository = {
     async findByExamId(examId: number): Promise<Question[]> {

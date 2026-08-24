@@ -7,7 +7,18 @@ export interface User {
     email: string;
     password?: string;
     role: UserRole;
+    matricule?: string;               
+    must_change_password?: boolean;  
     is_active: boolean;
+    created_at?: Date;
+    updated_at?: Date;               
+}
+
+export interface Course {
+    id: string;
+    code: string;
+    name: string;
+    description?: string | null;
     created_at?: Date;
 }
 
@@ -23,16 +34,17 @@ export interface Question {
     exam_id?: string;
     prompt: string;
     points: number;
-    choices: Choice[];
+    choices?: Choice[];
 }
 
 export interface Exam {
     id: string;
     course_id: string;
     title: string;
-    description: string;
+    description?: string | null;      
     start_date: Date;
     end_date: Date;
+    created_at?: Date;
 }
 
 export interface ExamAttempt {
@@ -49,4 +61,5 @@ export interface Answer {
     attempt_id: string;
     question_id: string;
     choice_id: string | null;
+    is_correct: boolean;            
 }
