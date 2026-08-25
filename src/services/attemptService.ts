@@ -1,100 +1,114 @@
-import * as attemptRepository from "../repositories/attemptRepository";
-import * as examRepository from "../repositories/examRepository";
+// src/services/attemptService.ts
+import { pool } from "../config/database";
+import { ApiError } from "../utils/ApiError";
 
-interface SubmitPayload {
-  exam_id: number;
-  student_id: number;
-  answers: Array<{ question_id: number; selected_choice_id: number }>;
-  tab_switch_count: number;
+export interface SubmitAnswerDTO {
+  question_id: number;
+  choice_id: number;
 }
 
-export const submitExamAttempt = async (payload: SubmitPayload) => {
-  const { exam_id, student_id, answers, tab_switch_count } = payload;
+export class AttemptService {
+  static async submitExam(
+    studentId: number,
+    examId: number,
+    submittedAnswers: SubmitAnswerDTO[],
+  ) {
+    const client = await pool.connect();
 
-  const existingAttempt = await attemptRepository.findAttemptByStudentAndExam(
-    student_id,
-    exam_id,
-  );
-  if (existingAttempt) {
-    const error: any = new Error("You have already submitted this exam.");
-    error.statusCode = 409;
-    throw error;
-  }
+    try {
+      await client.query("BEGIN");
 
-  const exam = await examRepository.findExamWithCorrectChoices(exam_id);
-  if (!exam) {
-    const error: any = new Error("Exam not found.");
-    error.statusCode = 404;
-    throw error;
-  }
+      // 1. Vérifier si l'examen existe et si la fenêtre est ouverte
+      const examRes = await client.query(
+        "SELECT id, starts_at, ends_at FROM exams WHERE id = $1",
+        [examId],
+      );
+      if (examRes.rows.length === 0) throw ApiError.notFound("Exam not found");
 
-  let rawScore = 0;
-  let totalPossiblePoints = 0;
-
-  exam.questions?.forEach((q) => {
-    totalPossiblePoints += Number(q.points);
-    const studentAnswer = answers.find((a) => a.question_id === q.id);
-    if (studentAnswer) {
-      const correctChoice = q.choices?.find((c) => c.is_correct);
-      if (
-        correctChoice &&
-        correctChoice.id === studentAnswer.selected_choice_id
-      ) {
-        rawScore += Number(q.points);
+      const exam = examRes.rows[0];
+      const now = new Date();
+      if (now < new Date(exam.starts_at) || now > new Date(exam.ends_at)) {
+        throw ApiError.forbidden("Exam is not available");
       }
+
+      // 2. Vérifier si l'étudiant n'a pas déjà soumis (RG-02)
+      const attemptCheck = await client.query(
+        "SELECT id FROM attempts WHERE student_id = $1 AND exam_id = $2",
+        [studentId, examId],
+      );
+      if (attemptCheck.rows.length > 0) {
+        throw ApiError.conflict("Exam already taken");
+      }
+
+      // 3. Charger toutes les questions et leurs choix corrects
+      const questionsRes = await client.query(
+        `
+        SELECT q.id as question_id, q.statement, q.points, q.position,
+               c.id as correct_choice_id
+        FROM questions q
+        JOIN choices c ON c.question_id = q.id
+        WHERE q.exam_id = $1 AND c.is_correct = true
+        ORDER BY q.position ASC
+      `,
+        [examId],
+      );
+
+      const questions = questionsRes.rows;
+      let totalPoints = 0;
+      let studentScore = 0;
+      const correction = [];
+
+      // Mappe des réponses fournies par l'étudiant
+      const answersMap = new Map<number, number>();
+      for (const ans of submittedAnswers) {
+        if (answersMap.has(ans.question_id)) {
+          throw ApiError.badRequest(
+            "Duplicate question response in submission",
+          );
+        }
+        answersMap.set(ans.question_id, ans.choice_id);
+      }
+
+      // 4. Évaluer chaque question
+      for (const q of questions) {
+        totalPoints += q.points;
+        const studentChoiceId = answersMap.get(q.question_id) ?? null;
+        const isCorrect = studentChoiceId === q.correct_choice_id;
+
+        if (isCorrect) {
+          studentScore += q.points;
+        }
+
+        correction.push({
+          question_id: q.question_id,
+          statement: q.statement,
+          points: q.points,
+          student_choice_id: studentChoiceId,
+          correct_choice_id: q.correct_choice_id,
+          is_correct: isCorrect,
+        });
+      }
+
+      // 5. Enregistrer la tentative en base
+      await client.query(
+        `INSERT INTO attempts (student_id, exam_id, score, total_points, submitted_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [studentId, examId, studentScore, totalPoints],
+      );
+
+      await client.query("COMMIT");
+
+      // 6. Retourner la réponse exactement comme décrite dans OpenAPI
+      return {
+        score: studentScore,
+        total_points: totalPoints,
+        correction,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-  });
-
-  const penaltyPoints = tab_switch_count * 2;
-  const scoreAfterPenalty = Math.max(0, rawScore - penaltyPoints);
-
-  const finalScoreOver20 =
-    totalPossiblePoints > 0
-      ? Math.round((scoreAfterPenalty / totalPossiblePoints) * 20 * 100) / 100
-      : 0;
-
-  const attempt = await attemptRepository.createAttempt({
-    exam_id,
-    student_id,
-    tab_switch_count,
-    penalty_points: penaltyPoints,
-    raw_score: rawScore,
-    final_score_over_20: finalScoreOver20,
-    is_submitted: true,
-  });
-
-  if (answers && answers.length > 0) {
-    await attemptRepository.saveStudentAnswers(attempt.id, answers);
   }
-
-  return {
-    attempt_id: attempt.id,
-    final_score_over_20: finalScoreOver20,
-    tab_switch_count,
-    penalty_points: penaltyPoints,
-  };
-};
-
-export const startExamAttempt = async (examId: number, studentId: number) => {
-  const existingAttempt = await attemptRepository.findAttemptByStudentAndExam(
-    studentId,
-    examId,
-  );
-  if (existingAttempt) {
-    const error: any = new Error("You have already taken this exam.");
-    error.statusCode = 409;
-    throw error;
-  }
-  return { status: "started", exam_id: examId, student_id: studentId };
-};
-
-export const incrementTabSwitch = async (
-  attemptId: number,
-  studentId: number,
-) => {
-  return await attemptRepository.incrementTabSwitchCount(attemptId);
-};
-
-export const getStudentAttemptHistory = async (studentId: number) => {
-  return await attemptRepository.findAttemptsByStudentId(studentId);
-};
+}

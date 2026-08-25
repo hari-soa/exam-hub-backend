@@ -1,9 +1,9 @@
 import { PoolClient } from "pg";
 import { pool } from "../config/database";
-import { Choice } from "../models/userModel";
+import { Choice } from "../models/examModel";
 
 export const ChoiceRepository = {
-  async findByQuestionId(questionId: string): Promise<Choice[]> {
+  async findByQuestionId(questionId: number): Promise<Choice[]> {
     const { rows } = await pool.query<Choice>(
       "SELECT * FROM choices WHERE question_id = $1",
       [questionId],
@@ -11,16 +11,16 @@ export const ChoiceRepository = {
     return rows;
   },
 
-  async findByQuestionIds(questionIds: string[]): Promise<Choice[]> {
+  async findByQuestionIds(questionIds: number[]): Promise<Choice[]> {
     if (questionIds.length === 0) return [];
     const { rows } = await pool.query<Choice>(
-      "SELECT * FROM choices WHERE question_id = ANY($1::text[])",
+      "SELECT * FROM choices WHERE question_id = ANY($1::int[])",
       [questionIds],
     );
     return rows;
   },
 
-  async findById(id: string): Promise<Choice | null> {
+  async findById(id: number): Promise<Choice | null> {
     const { rows } = await pool.query<Choice>(
       "SELECT * FROM choices WHERE id = $1",
       [id],
@@ -30,22 +30,22 @@ export const ChoiceRepository = {
 
   async create(
     client: PoolClient,
-    questionId: string,
-    text: string,
+    questionId: number,
+    choiceText: string,
     isCorrect: boolean,
   ): Promise<Choice> {
     const { rows } = await client.query<Choice>(
-      `INSERT INTO choices (question_id, text, is_correct)
-             VALUES ($1, $2, $3)
-             RETURNING *`,
-      [questionId, text, isCorrect],
+      `INSERT INTO choices (question_id, choice_text, is_correct)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [questionId, choiceText, isCorrect],
     );
     return rows[0];
   },
 
   async deleteByQuestionId(
     client: PoolClient,
-    questionId: string,
+    questionId: number,
   ): Promise<void> {
     await client.query("DELETE FROM choices WHERE question_id = $1", [
       questionId,

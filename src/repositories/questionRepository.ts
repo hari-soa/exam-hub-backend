@@ -1,10 +1,10 @@
 import { pool } from "../config/database";
-import { Question } from "../models/userModel";
+import { Question } from "../models/examModel";
 
 export const QuestionRepository = {
   async findByExamId(examId: number): Promise<Question[]> {
     const { rows } = await pool.query<Question>(
-      "SELECT * FROM questions WHERE exam_id = $1 ORDER BY position ASC, id ASC",
+      "SELECT * FROM questions WHERE exam_id = $1 ORDER BY id ASC",
       [examId],
     );
     return rows;

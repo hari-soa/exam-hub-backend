@@ -9,19 +9,16 @@ const seedAdmin = async () => {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPassword = process.env.ADMIN_PASSWORD;
-
     if (!adminEmail || !adminPassword) {
       throw new Error("ADMIN_EMAIL or ADMIN_PASSWORD is missing in .env file");
     }
-
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
     const existingAdmin = await userRepository.findUserByEmail(adminEmail);
-
     if (!existingAdmin) {
       await pool.query(
-        `INSERT INTO users (full_name, email, password, role, is_active)
-         VALUES ($1, $2, $3, $4, $5)`,
-        ["System Admin", adminEmail, hashedPassword, "admin", true],
+        `INSERT INTO users (first_name, last_name, email, password, role, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        ["System", "Admin", adminEmail, hashedPassword, "admin", true],
       );
       console.log(`Admin account created successfully (${adminEmail}).`);
     } else {

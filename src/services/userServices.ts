@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import * as userRepository from "../repositories/userRepository";
-import { User, CreateUserDTO, UpdateUserDTO } from "../models/userModel";
+import { User, CreateUserDTO, UpdateUserDTO } from "../models";
+import { ApiError } from "../middlewares/ApiError";
 
 export const getAllStudents = async (): Promise<User[]> => {
   return await userRepository.findAllStudents();
@@ -11,12 +12,10 @@ export const createStudentAccount = async (
 ): Promise<User> => {
   const existingUser = await userRepository.findUserByEmail(data.email);
   if (existingUser) {
-    const error: any = new Error("An account with this email already exists.");
-    error.statusCode = 409;
-    throw error;
+    throw ApiError.conflict("Un compte avec cet email existe déjà.");
   }
 
-  const hashedPassword = await bcrypt.hash(data.password, 10);
+  const hashedPassword = await bcrypt.hash(data.password!, 10);
 
   return await userRepository.createUser({
     ...data,
@@ -31,9 +30,7 @@ export const updateStudentProfile = async (
 ): Promise<User> => {
   const updatedUser = await userRepository.updateUser(id, data);
   if (!updatedUser) {
-    const error: any = new Error("Student not found.");
-    error.statusCode = 404;
-    throw error;
+    throw ApiError.notFound("Étudiant introuvable.");
   }
   return updatedUser;
 };
@@ -41,8 +38,6 @@ export const updateStudentProfile = async (
 export const deactivateStudentAccount = async (id: number): Promise<void> => {
   const success = await userRepository.deactivateUser(id);
   if (!success) {
-    const error: any = new Error("Student not found or already inactive.");
-    error.statusCode = 404;
-    throw error;
+    throw ApiError.notFound("Étudiant introuvable ou déjà inactif.");
   }
 };

@@ -1,28 +1,26 @@
-import * as attemptRepository from "../repositories/attemptRepository";
-import * as examRepository from "../repositories/examRepository";
+import { AttemptRepository } from "../repositories/attemptRepository";
+import { ExamRepository } from "../repositories/examRepository";
+import { AnswerRepository } from "../repositories/answerRepository";
+import { ApiError } from "../middlewares/ApiError";
 
 export const getStudentResults = async (studentId: number) => {
-  return await attemptRepository.findAttemptsByStudentId(studentId);
+  return await AttemptRepository.findByStudentId(studentId);
 };
 
 export const getDetailedResultForStudent = async (
   attemptId: number,
   studentId: number,
 ) => {
-  const attempt = await attemptRepository.findAttemptById(attemptId);
+  const attempt = await AttemptRepository.findById(attemptId);
   if (!attempt || attempt.student_id !== studentId) {
-    const error: any = new Error("Result record not found.");
-    error.statusCode = 404;
-    throw error;
+    throw ApiError.notFound("Exam result record not found.");
   }
 
-  const exam = await examRepository.findExamById(attempt.exam_id);
+  const exam = await ExamRepository.findByIdWithQuestions(attempt.exam_id);
   const now = new Date();
 
   const showCorrection = exam ? now > new Date(exam.end_time) : false;
-
-  const answers =
-    await attemptRepository.findStudentAnswersByAttemptId(attemptId);
+  const answers = await AnswerRepository.findByAttemptId(attemptId);
 
   return {
     attempt,
@@ -32,7 +30,7 @@ export const getDetailedResultForStudent = async (
 };
 
 export const getExamResultsForAdmin = async (examId: number) => {
-  const attempts = await attemptRepository.findAttemptsByExamId(examId);
+  const attempts = await AttemptRepository.findByExamId(examId);
 
   const totalAttempts = attempts.length;
   const averageScore =

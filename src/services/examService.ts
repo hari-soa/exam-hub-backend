@@ -1,11 +1,12 @@
-import * as examRepository from "../repositories/examRepository";
+import { ExamRepository } from "../repositories/examRepository";
 import { Exam } from "../models/examModel";
+import { ApiError } from "../middlewares/ApiError";
 
 export const getAvailableExamsForStudent = async (
-  studentId: number,
+  _studentId: number,
 ): Promise<Exam[]> => {
   const now = new Date();
-  const exams = await examRepository.findAllExams();
+  const exams = await ExamRepository.findAll();
   return exams.filter((exam) => {
     const start = new Date(exam.start_time);
     const end = new Date(exam.end_time);
@@ -14,22 +15,20 @@ export const getAvailableExamsForStudent = async (
 };
 
 export const getExamForStudent = async (examId: number): Promise<Exam> => {
-  const exam = await examRepository.findExamById(examId);
+  const exam = await ExamRepository.findByIdWithQuestions(examId);
   if (!exam) {
-    const error: any = new Error("Exam not found.");
-    error.statusCode = 404;
-    throw error;
+    throw ApiError.notFound("Examen introuvable.");
   }
+
   const now = new Date();
   if (now < new Date(exam.start_time) || now > new Date(exam.end_time)) {
-    const error: any = new Error("This exam is not currently available.");
-    error.statusCode = 403;
-    throw error;
+    throw ApiError.forbidden("Cet examen n'est pas disponible pour le moment.");
   }
+
   if (exam.questions) {
-    exam.questions.forEach((q) => {
+    exam.questions.forEach((q: any) => {
       if (q.choices) {
-        q.choices.forEach((c) => {
+        q.choices.forEach((c: any) => {
           delete c.is_correct;
         });
       }
