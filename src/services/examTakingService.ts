@@ -5,11 +5,11 @@ import { ChoiceRepository } from "../repositories/choiceRepository";
 import { AttemptRepository } from "../repositories/attemptRepository";
 import { AnswerRepository } from "../repositories/answerRepository";
 import { ApiError } from "../middlewares/ApiError";
-import { Exam, Question, Choice } from "../models/userModel";
+import { Exam, Question, Choice } from "../models/examModel";
 import { gradeExam, SubmittedAnswer } from "./studentExamService";
 
 export interface QuestionForStudent {
-  id: string;
+  id: number;
   prompt: string;
   points: number;
   choices: Omit<Choice, "is_correct">[];
@@ -22,11 +22,11 @@ export interface ExamForStudent {
 
 function isWindowOpen(exam: Exam): boolean {
   const now = new Date();
-  return now >= new Date(exam.start_date) && now <= new Date(exam.end_date);
+  return now >= new Date(exam.start_time) && now <= new Date(exam.end_time);
 }
 
 export const ExamTakingService = {
-  async listAvailable(studentId: string): Promise<Exam[]> {
+  async listAvailable(studentId: number): Promise<Exam[]> {
     const exams = await ExamRepository.findAll();
     const availableExams: Exam[] = [];
 
@@ -46,8 +46,8 @@ export const ExamTakingService = {
   },
 
   async getExamForStudent(
-    studentId: string,
-    examId: string,
+    studentId: number,
+    examId: number,
   ): Promise<ExamForStudent> {
     const exam = await ExamRepository.findByIdWithQuestions(examId);
     if (!exam) throw ApiError.notFound("Exam not found");
@@ -64,26 +64,26 @@ export const ExamTakingService = {
       throw ApiError.conflict("You have already taken this exam");
     }
 
-    const rawQuestions = await QuestionRepository.findByExamId(Number(examId));
-    const questions = rawQuestions.map((q: any) => ({
-      id: String(q.id),
-      exam_id: String(q.exam_id),
-      prompt: q.prompt || q.statement,
+    const rawQuestions = await QuestionRepository.findByExamId(examId);
+    const questions: Question[] = rawQuestions.map((q: any) => ({
+      id: Number(q.id),
+      exam_id: Number(q.exam_id),
+      question_text: q.prompt || q.statement || q.question_text,
       points: Number(q.points),
     }));
 
     const questionIds = questions.map((q) => q.id);
     const rawChoices = await ChoiceRepository.findByQuestionIds(questionIds);
     const choices: Choice[] = rawChoices.map((c: any) => ({
-      id: String(c.id),
-      question_id: String(c.question_id),
-      text: c.text || c.label,
+      id: Number(c.id),
+      question_id: Number(c.question_id),
+      choice_text: c.text || c.label || c.choice_text,
       is_correct: Boolean(c.is_correct),
     }));
 
     const questionsForStudent: QuestionForStudent[] = questions.map((q) => ({
       id: q.id,
-      prompt: q.prompt,
+      prompt: q.question_text,
       points: Number(q.points),
       choices: choices
         .filter((c) => c.question_id === q.id)
@@ -93,7 +93,7 @@ export const ExamTakingService = {
     return { exam, questions: questionsForStudent };
   },
 
-  async submit(studentId: string, examId: string, answers: SubmittedAnswer[]) {
+  async submit(studentId: number, examId: number, answers: SubmittedAnswer[]) {
     const exam = await ExamRepository.findByIdWithQuestions(examId);
     if (!exam) throw ApiError.notFound("Exam not found");
 
@@ -115,15 +115,15 @@ export const ExamTakingService = {
       throw ApiError.badRequest("Invalid answers format");
     }
 
-    const rawQuestions = await QuestionRepository.findByExamId(Number(examId));
+    const rawQuestions = await QuestionRepository.findByExamId(examId);
     if (rawQuestions.length === 0) {
       throw ApiError.conflict("This exam contains no questions");
     }
 
     const questions: Question[] = rawQuestions.map((q: any) => ({
-      id: String(q.id),
-      exam_id: String(q.exam_id),
-      prompt: q.prompt || q.statement,
+      id: Number(q.id),
+      exam_id: Number(q.exam_id),
+      question_text: q.prompt || q.statement || q.question_text,
       points: Number(q.points),
       choices: [],
     }));
@@ -131,13 +131,13 @@ export const ExamTakingService = {
     const questionIds = questions.map((q) => q.id);
     const rawChoices = await ChoiceRepository.findByQuestionIds(questionIds);
     const allChoices: Choice[] = rawChoices.map((c: any) => ({
-      id: String(c.id),
-      question_id: String(c.question_id),
-      text: c.text || c.label,
+      id: Number(c.id),
+      question_id: Number(c.question_id),
+      choice_text: c.text || c.label || c.choice_text,
       is_correct: Boolean(c.is_correct),
     }));
 
-    const choicesByQuestion = new Map<string, Choice[]>();
+    const choicesByQuestion = new Map<number, Choice[]>();
     for (const q of questions) {
       choicesByQuestion.set(
         q.id,
@@ -147,13 +147,13 @@ export const ExamTakingService = {
 
     const validQuestionIds = new Set(questions.map((q) => q.id));
     const sanitizedAnswers: SubmittedAnswer[] = answers
-      .filter((a) => a && validQuestionIds.has(String(a.question_id)))
+      .filter((a) => a && validQuestionIds.has(Number(a.question_id)))
       .map((a) => ({
-        question_id: String(a.question_id),
+        question_id: Number(a.question_id),
         choice_id:
           a.choice_id === null || a.choice_id === undefined
             ? null
-            : String(a.choice_id),
+            : Number(a.choice_id),
       }));
 
     const grading = gradeExam(questions, choicesByQuestion, sanitizedAnswers);
