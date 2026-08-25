@@ -1,22 +1,68 @@
-import { ExamTakingService } from "../services/examTakingService";
-import { StudentHistoryService } from "../services/studentHistoryService";
-import { SubmittedAnswer } from "../services/studentExamService";
+import { Request, Response, NextFunction } from "express";
+import * as attemptService from "../services/attemptService";
 
-export const attemptService = {
- 
-    async getAvailableExams(studentId: string) {
-        return await ExamTakingService.listAvailable(studentId);
-    },
+export const AttemptController = {
+  async startAttempt(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const examId = parseInt(req.params.examId, 10);
+      const studentId = (req as any).user.id;
 
-    async getExamDetailsForStudent(examId: string, studentId: string) {
-        return await ExamTakingService.getExamForStudent(studentId, examId);
-    },
+      const attempt = await attemptService.startExamAttempt(examId, studentId);
+      res.status(201).json(attempt);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    async submitExamAttempt(examId: string, studentId: string, answers: SubmittedAnswer[]) {
-        return await ExamTakingService.submit(studentId, examId, answers);
-    },
+  async recordTabSwitch(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const attemptId = parseInt(req.params.attemptId, 10);
+      const studentId = (req as any).user.id;
 
-    async getStudentResultHistory(studentId: string) {
-        return await StudentHistoryService.getStudentHistory(studentId);
-    },
+      const updatedCount = await attemptService.incrementTabSwitch(
+        attemptId,
+        studentId,
+      );
+      res.status(200).json({
+        message: "Tab switch penalty recorded.",
+        tab_switch_count: updatedCount,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async submitAttempt(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const examId = parseInt(req.params.examId, 10);
+      const studentId = (req as any).user.id;
+      const { answers, tab_switch_count } = req.body;
+
+      const result = await attemptService.submitExamAttempt({
+        exam_id: examId,
+        student_id: studentId,
+        answers,
+        tab_switch_count: tab_switch_count || 0,
+      });
+
+      res.status(200).json({
+        message: "Exam submitted successfully.",
+        result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

@@ -1,24 +1,51 @@
-import { Request, Response } from "express";
-import { ResultsService } from "../services/studentHistoryService";
-import { asyncHandler } from "../middlewares/errorHandler";
-import { ApiError } from "../middlewares/ApiError";
+import { Request, Response, NextFunction } from "express";
+import * as resultService from "../services/resultService";
 
-export const ResultsController = {
-  getExamResults: asyncHandler(async (req: Request, res: Response) => {
-    const examId = Array.isArray(req.params.id)
-      ? req.params.id[0]
-      : req.params.id;
-    if (!examId) throw ApiError.badRequest("Invalid exam ID");
+export const ResultController = {
+  async getStudentHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const studentId = (req as any).user.id;
+      const history = await resultService.getStudentResults(studentId);
+      res.status(200).json(history);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    const results = await ResultsService.getExamResults(examId);
-    res.json(results);
-  }),
+  async getStudentExamResult(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const attemptId = parseInt(req.params.attemptId, 10);
+      const studentId = (req as any).user.id;
 
-  getMyResults: asyncHandler(async (req: Request, res: Response) => {
-    const studentId = req.user?.id;
-    if (!studentId) throw ApiError.badRequest("Unauthorized");
+      const resultDetails = await resultService.getDetailedResultForStudent(
+        attemptId,
+        studentId,
+      );
+      res.status(200).json(resultDetails);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    const results = await ResultsService.getStudentHistory(studentId);
-    res.json(results);
-  }),
+  async getAdminExamResults(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const examId = parseInt(req.params.examId, 10);
+      const adminResults = await resultService.getExamResultsForAdmin(examId);
+      res.status(200).json(adminResults);
+    } catch (error) {
+      next(error);
+    }
+  },
 };
