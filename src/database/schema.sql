@@ -9,8 +9,10 @@ DROP TABLE IF EXISTS users CASCADE;
 CREATE TYPE user_role AS ENUM ('admin', 'student');
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    full_name VARCHAR(100) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
+    matricule VARCHAR(50) UNIQUE,
     password VARCHAR(255) NOT NULL,
     role user_role NOT NULL DEFAULT 'student',
     is_active BOOLEAN NOT NULL DEFAULT true,
