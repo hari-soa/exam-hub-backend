@@ -1,14 +1,15 @@
 import { Router } from "express";
-import { authenticateToken, requireRole } from "../security/errorMiddleware";
-import * as attemptController from "../controllers/attemptController";
+import { StudentExamController } from "../controllers/studentExamController";
+import { StudentHistoryController } from "../controllers/studentHistoryController";
+import { authenticateToken, requireRole } from "../middlewares/authMiddleWarre";
 
 const router = Router();
 
 router.use(authenticateToken, requireRole("student"));
 
-router.get("/my/exams", attemptController.getAvailableExams);
-router.get("/my/exams/:id", attemptController.getExamForStudent);
-router.post("/my/exams/:id/submit", attemptController.submitExam);
-router.get("/my/results", attemptController.getStudentResults);
+router.get("/my/exams", StudentExamController.listAvailable);
+router.get("/my/exams/:id", StudentExamController.getOne);
+router.post("/my/exams/:id/submit", StudentExamController.submit);
+router.get("/my/results", StudentHistoryController.getHistory);
 
 export default router;
