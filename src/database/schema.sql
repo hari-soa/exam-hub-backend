@@ -1,70 +1,79 @@
-CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(36) PRIMARY KEY,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
+DROP TABLE IF EXISTS student_answers CASCADE;
+DROP TABLE IF EXISTS exam_attempts CASCADE;
+DROP TABLE IF EXISTS choices CASCADE;
+DROP TABLE IF EXISTS questions CASCADE;
+DROP TABLE IF EXISTS exams CASCADE;
+DROP TABLE IF EXISTS courses CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+CREATE TYPE user_role AS ENUM ('admin', 'student');
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(50) CHECK (role IN ('admin', 'student')) DEFAULT 'student',
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    role user_role NOT NULL DEFAULT 'student',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE courses (
-    id VARCHAR(36) PRIMARY KEY,
-    code VARCHAR(50) UNIQUE NOT NULL,
-    name VARCHAR(255) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(20) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
     description TEXT,
+    professor_name VARCHAR(100),
+    credits INT NOT NULL DEFAULT 4,
+    semester VARCHAR(20) DEFAULT 'Semester 1',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE exams (
-    id VARCHAR(36) PRIMARY KEY,
-    course_id VARCHAR(36) NOT NULL REFERENCES courses(id) ON DELETE RESTRICT,
-    title VARCHAR(255) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    course_id INT NOT NULL REFERENCES courses(id) ON DELETE RESTRICT,
+    title VARCHAR(150) NOT NULL,
     description TEXT,
-    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    duration_minutes INT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE questions (
-    id VARCHAR(36) PRIMARY KEY,
-    exam_id VARCHAR(36) NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
-    prompt TEXT NOT NULL,
-    points INT NOT NULL CHECK (points > 0),
+    id SERIAL PRIMARY KEY,
+    exam_id INT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    points DECIMAL(5, 2) NOT NULL DEFAULT 1.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE choices (
-    id VARCHAR(36) PRIMARY KEY,
-    question_id VARCHAR(36) NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
-    is_correct BOOLEAN NOT NULL DEFAULT FALSE,
+    id SERIAL PRIMARY KEY,
+    question_id INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    choice_text TEXT NOT NULL,
+    is_correct BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE exam_attempts (
-    id VARCHAR(36) PRIMARY KEY,
-    exam_id VARCHAR(36) NOT NULL REFERENCES exams(id) ON DELETE RESTRICT,
-    student_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    score INT NOT NULL DEFAULT 0,
-    total_points INT NOT NULL DEFAULT 0,
+    id SERIAL PRIMARY KEY,
+    exam_id INT NOT NULL REFERENCES exams(id) ON DELETE RESTRICT,
+    student_id INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    tab_switch_count INT NOT NULL DEFAULT 0,
+    penalty_points DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    raw_score DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    final_score_over_20 DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    is_submitted BOOLEAN NOT NULL DEFAULT true,
     CONSTRAINT unique_student_exam_attempt UNIQUE (exam_id, student_id)
 );
 
-CREATE TABLE attempt_answers (
-    id VARCHAR(36) PRIMARY KEY,
-    attempt_id VARCHAR(36) NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
-    question_id VARCHAR(36) NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    choice_id VARCHAR(36) REFERENCES choices(id) ON DELETE SET NULL,
-    is_correct BOOLEAN NOT NULL DEFAULT FALSE
+CREATE TABLE student_answers (
+    id SERIAL PRIMARY KEY,
+    attempt_id INT NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    question_id INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    selected_choice_id INT REFERENCES choices(id) ON DELETE SET NULL,
+    is_correct BOOLEAN NOT NULL DEFAULT false,
+    points_awarded DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)
 );
-
-ALTER TABLE users 
-ADD COLUMN IF NOT EXISTS matricule VARCHAR(50) UNIQUE,
-ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT true;
-
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_matricule ON users(matricule);
