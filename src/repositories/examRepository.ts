@@ -1,34 +1,65 @@
-import { pool } from "../configuration/database";
-import { Exam } from "../models/userModel";
+import { pool } from '../configuration/database.js';
+import { Exam } from '../models/userModel.js';
 
-export const ExamRepository = {
-    async findAll(): Promise<Exam[]> {
-        const query = `SELECT id, course_id, title, description, start_date, end_date FROM exams`;
-        const result = await pool.query<Exam>(query);
-        return result.rows;
-    },
+export class ExamRepository {
+  static async findAll(): Promise<Exam[]> {
+    const query = `SELECT * FROM exams ORDER BY created_at DESC`;
+    const result = await pool.query(query);
+    return result.rows;
+  }
 
-    async findByIdWithQuestions(examId: string): Promise<any> {
-        const examQuery = `SELECT id, course_id, title, description, start_date, end_date FROM exams WHERE id = $1`;
-        const examResult = await pool.query(examQuery, [examId]);
-        if (examResult.rows.length === 0) return null;
+  static async findById(id: string): Promise<Exam | undefined> {
+    const query = `SELECT * FROM exams WHERE id = $1`;
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
 
-        const questionsQuery = `SELECT id, exam_id, prompt, points FROM questions WHERE exam_id = $1`;
-        const questionsResult = await pool.query(questionsQuery, [examId]);
+  static async create(exam: Omit<Exam, 'id'>): Promise<Exam> {
+    const query = `
+      INSERT INTO exams (course_id, title, instructions, duration_minutes, start_time, end_time)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, course_id, title, instructions, duration_minutes, start_time, end_time
+    `;
+    const values = [
+      exam.course_id,
+      exam.title,
+      exam.instructions || null,
+      exam.duration_minutes,
+      exam.start_date,
+      exam.end_date
+    ];
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
 
-        const questions = [];
-        for (const q of questionsResult.rows) {
-            const choicesQuery = `SELECT id, question_id, text FROM choices WHERE question_id = $1`;
-            const choicesResult = await pool.query(choicesQuery, [q.id]);
-            questions.push({
-                ...q,
-                choices: choicesResult.rows
-            });
-        }
+  static async update(id: string, exam: Partial<Exam>): Promise<Exam | undefined> {
+    const query = `
+      UPDATE exams
+      SET course_id = COALESCE($1, course_id),
+          title = COALESCE($2, title),
+          instructions = COALESCE($3, instructions),
+          duration_minutes = COALESCE($4, duration_minutes),
+          start_time = COALESCE($5, start_time),
+          end_time = COALESCE($6, end_time)
+      WHERE id = $7
+      RETURNING id, course_id, title, instructions, duration_minutes, start_time, end_time
+    `;
+    const values = [
+      exam.course_id,
+      exam.title,
+      exam.instructions,
+      exam.duration_minutes,
+      exam.start_date,
+      exam.end_date,
+      id
+    ];
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
 
-        return {
-            ...examResult.rows[0],
-            questions
-        };
-    },
-};
+  static async delete(id: string): Promise<boolean> {
+    const query = `DELETE FROM exams WHERE id = $1`;
+    const result = await pool.query(query, [id]);
+    return (result.rowCount ?? 0) > 0;
+  }
+}

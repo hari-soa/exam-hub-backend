@@ -1,13 +1,5 @@
-import { pool } from '../configuration/database.js';
-
-export interface Course {
-  id: string;
-  code: string;
-  title: string;
-  description?: string;
-  instructor_id: string;
-  created_at?: Date;
-}
+import { pool } from '../configuration/database';
+import { Course } from '../models/userModel';
 
 export class CourseRepository {
   static async findAll(): Promise<Course[]> {
