@@ -1,4 +1,3 @@
-// src/controllers/adminExamController.ts
 import { Request, Response, NextFunction } from "express";
 import { ExamService } from "../services/examService";
 

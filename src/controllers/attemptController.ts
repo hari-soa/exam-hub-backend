@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import * as attemptService from "../services/attemptService";
+import * as rawAttemptService from "../services/attemptService";
+
+const attemptService = rawAttemptService as any;
 
 export const AttemptController = {
   async startAttempt(
@@ -8,7 +10,7 @@ export const AttemptController = {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const examId = parseInt(req.params.examId, 10);
+      const examId = parseInt(req.params.examId as string, 10);
       const studentId = (req as any).user.id;
 
       const attempt = await attemptService.startExamAttempt(examId, studentId);
@@ -24,7 +26,7 @@ export const AttemptController = {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const attemptId = parseInt(req.params.attemptId, 10);
+      const attemptId = parseInt(req.params.attemptId as string, 10);
       const studentId = (req as any).user.id;
 
       const updatedCount = await attemptService.incrementTabSwitch(
@@ -46,7 +48,7 @@ export const AttemptController = {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const examId = parseInt(req.params.examId, 10);
+      const examId = parseInt(req.params.examId as string, 10);
       const studentId = (req as any).user.id;
       const { answers, tab_switch_count } = req.body;
 

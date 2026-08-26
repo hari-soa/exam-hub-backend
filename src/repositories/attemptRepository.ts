@@ -64,9 +64,10 @@ export const AttemptRepository = {
   },
 
   async createAttempt(
-    client: PoolClient,
     data: Omit<ExamAttempt, "id" | "submitted_at">,
+    client?: PoolClient,
   ): Promise<ExamAttempt> {
+    const dbClient = client || pool;
     const query = `
       INSERT INTO exam_attempts 
         (exam_id, student_id, tab_switch_count, penalty_points, raw_score, final_score_over_20, is_submitted)
@@ -90,32 +91,35 @@ export const AttemptRepository = {
       data.final_score_over_20,
       data.is_submitted,
     ];
-    const { rows } = await client.query(query, values);
+    const { rows } = await dbClient.query(query, values);
     return rows[0];
   },
 
   async create(
-    client: PoolClient,
     studentId: number,
     examId: number,
     rawScore: number,
     totalPoints: number,
     tabSwitchCount: number = 0,
     penaltyPoints: number = 0,
+    client?: PoolClient,
   ): Promise<ExamAttempt> {
     const finalScore = Math.max(
       0,
       (rawScore / (totalPoints || 1)) * 20 - penaltyPoints,
     );
-    return this.createAttempt(client, {
-      exam_id: examId,
-      student_id: studentId,
-      tab_switch_count: tabSwitchCount,
-      penalty_points: penaltyPoints,
-      raw_score: rawScore,
-      final_score_over_20: Math.round(finalScore * 100) / 100,
-      is_submitted: true,
-    });
+    return this.createAttempt(
+      {
+        exam_id: examId,
+        student_id: studentId,
+        tab_switch_count: tabSwitchCount,
+        penalty_points: penaltyPoints,
+        raw_score: rawScore,
+        final_score_over_20: Math.round(finalScore * 100) / 100,
+        is_submitted: true,
+      },
+      client,
+    );
   },
 
   async incrementTabSwitch(

@@ -169,4 +169,38 @@ export const ExamService = {
       client.release();
     }
   },
+
+  async updateQuestion(
+    questionId: number,
+    data: Partial<Question>,
+  ): Promise<Question> {
+    const question = await questionRepo.findById(questionId);
+    if (!question) throw ApiError.notFound("Question not found");
+
+    const attempts = await AttemptRepository.findByExamId(question.exam_id);
+    if (attempts.length > 0) {
+      throw ApiError.conflict(
+        "Cannot update a question in an exam with existing attempts.",
+      );
+    }
+
+    const updated = await questionRepo.update(questionId, data);
+    if (!updated) throw ApiError.notFound("Question not found");
+
+    return updated;
+  },
+
+  async deleteQuestion(questionId: number): Promise<void> {
+    const question = await questionRepo.findById(questionId);
+    if (!question) throw ApiError.notFound("Question not found");
+
+    const attempts = await AttemptRepository.findByExamId(question.exam_id);
+    if (attempts.length > 0) {
+      throw ApiError.conflict(
+        "Cannot delete a question in an exam with existing attempts.",
+      );
+    }
+
+    await questionRepo.delete(questionId);
+  },
 };
