@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import * as rawUserService from "../services/userServices";
+import * as rawUserService from "../services/userService";
 
 const userService = rawUserService as any;
 
