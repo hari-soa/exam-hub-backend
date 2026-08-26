@@ -29,12 +29,13 @@ export const ChoiceRepository = {
   },
 
   async create(
-    client: PoolClient,
     questionId: number,
     choiceText: string,
     isCorrect: boolean,
+    client?: PoolClient,
   ): Promise<Choice> {
-    const { rows } = await client.query<Choice>(
+    const dbClient = client || pool;
+    const { rows } = await dbClient.query<Choice>(
       `INSERT INTO choices (question_id, choice_text, is_correct)
        VALUES ($1, $2, $3)
        RETURNING *`,
@@ -44,10 +45,11 @@ export const ChoiceRepository = {
   },
 
   async deleteByQuestionId(
-    client: PoolClient,
     questionId: number,
+    client?: PoolClient,
   ): Promise<void> {
-    await client.query("DELETE FROM choices WHERE question_id = $1", [
+    const dbClient = client || pool;
+    await dbClient.query("DELETE FROM choices WHERE question_id = $1", [
       questionId,
     ]);
   },

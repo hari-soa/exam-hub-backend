@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { ExamService } from "../services/examService";
 
 export class AdminExamController {
-  static async listExams(req: Request, res: Response, next: NextFunction) {
+  static async listExams(_req: Request, res: Response, next: NextFunction) {
     try {
       const exams = await ExamService.getAllExams();
       res.json(exams);
@@ -56,6 +56,36 @@ export class AdminExamController {
       const id = Number(req.params.id);
       const results = await ExamService.getExamResults(id);
       res.json(results);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async addQuestion(req: Request, res: Response, next: NextFunction) {
+    try {
+      const examId = Number(req.params.id);
+      const question = await ExamService.addQuestionToExam(examId, req.body);
+      res.status(201).json(question);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async updateQuestion(req: Request, res: Response, next: NextFunction) {
+    try {
+      const questionId = Number(req.params.id);
+      const question = await ExamService.updateQuestion(questionId, req.body);
+      res.json(question);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async deleteQuestion(req: Request, res: Response, next: NextFunction) {
+    try {
+      const questionId = Number(req.params.id);
+      await ExamService.deleteQuestion(questionId);
+      res.json({ message: "Question deleted successfully" });
     } catch (err) {
       next(err);
     }

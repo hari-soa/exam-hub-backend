@@ -31,4 +31,43 @@ export const ExamRepository = {
       questions,
     };
   },
+
+  async findById(id: number) {
+    const { rows } = await pool.query("SELECT * FROM exams WHERE id = $1;", [
+      id,
+    ]);
+    return rows[0] || null;
+  },
+
+  async create(data: any) {
+    const { rows } = await pool.query(
+      `INSERT INTO exams (course_id, title, description, starts_at, ends_at)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *;`,
+      [
+        data.course_id,
+        data.title,
+        data.description || null,
+        data.starts_at,
+        data.ends_at,
+      ],
+    );
+    return rows[0];
+  },
+
+  async update(id: number, data: any) {
+    const { rows } = await pool.query(
+      `UPDATE exams
+       SET title = COALESCE($1, title),
+           description = COALESCE($2, description),
+           starts_at = COALESCE($3, starts_at),
+           ends_at = COALESCE($4, ends_at)
+       WHERE id = $5 RETURNING *;`,
+      [data.title, data.description, data.starts_at, data.ends_at, id],
+    );
+    return rows[0] || null;
+  },
+
+  async delete(id: number) {
+    await pool.query("DELETE FROM exams WHERE id = $1;", [id]);
+  },
 };
