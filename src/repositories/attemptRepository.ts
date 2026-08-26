@@ -2,6 +2,13 @@ import { PoolClient } from "pg";
 import { pool } from "../config/database";
 import { ExamAttempt } from "../models/examModel";
 
+export interface ExamAttemptWithUser extends ExamAttempt {
+  attempt_id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
 export const AttemptRepository = {
   async findByStudentAndExam(
     studentId: number,
@@ -33,7 +40,7 @@ export const AttemptRepository = {
     return rows;
   },
 
-  async findByExamId(examId: number): Promise<any[]> {
+  async findByExamId(examId: number): Promise<ExamAttemptWithUser[]> {
     const query = `
       SELECT 
         a.id AS attempt_id,

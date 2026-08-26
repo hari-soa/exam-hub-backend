@@ -20,9 +20,11 @@ export interface ExamForStudent {
   questions: QuestionForStudent[];
 }
 
-function isWindowOpen(exam: Exam): boolean {
+function isWindowOpen(exam: any): boolean {
   const now = new Date();
-  return now >= new Date(exam.start_time) && now <= new Date(exam.end_time);
+  const startDate = new Date(exam.starts_at || exam.start_time);
+  const endDate = new Date(exam.ends_at || exam.end_time);
+  return now >= startDate && now <= endDate;
 }
 
 export const ExamTakingService = {
@@ -41,7 +43,6 @@ export const ExamTakingService = {
         }
       }
     }
-
     return availableExams;
   },
 
@@ -68,7 +69,7 @@ export const ExamTakingService = {
     const questions: Question[] = rawQuestions.map((q: any) => ({
       id: Number(q.id),
       exam_id: Number(q.exam_id),
-      question_text: q.prompt || q.statement || q.question_text,
+      question_text: q.question_text || q.statement || q.prompt,
       points: Number(q.points),
     }));
 
@@ -77,7 +78,7 @@ export const ExamTakingService = {
     const choices: Choice[] = rawChoices.map((c: any) => ({
       id: Number(c.id),
       question_id: Number(c.question_id),
-      choice_text: c.text || c.label || c.choice_text,
+      choice_text: c.choice_text || c.text || c.label,
       is_correct: Boolean(c.is_correct),
     }));
 
@@ -96,7 +97,6 @@ export const ExamTakingService = {
   async submit(studentId: number, examId: number, answers: SubmittedAnswer[]) {
     const exam = await ExamRepository.findByIdWithQuestions(examId);
     if (!exam) throw ApiError.notFound("Exam not found");
-
     if (!isWindowOpen(exam)) {
       throw ApiError.forbidden(
         "The availability window for this exam is closed",
@@ -110,7 +110,6 @@ export const ExamTakingService = {
     if (already) {
       throw ApiError.conflict("You have already taken this exam");
     }
-
     if (!Array.isArray(answers)) {
       throw ApiError.badRequest("Invalid answers format");
     }
@@ -123,7 +122,7 @@ export const ExamTakingService = {
     const questions: Question[] = rawQuestions.map((q: any) => ({
       id: Number(q.id),
       exam_id: Number(q.exam_id),
-      question_text: q.prompt || q.statement || q.question_text,
+      question_text: q.question_text || q.statement || q.prompt,
       points: Number(q.points),
       choices: [],
     }));
@@ -133,7 +132,7 @@ export const ExamTakingService = {
     const allChoices: Choice[] = rawChoices.map((c: any) => ({
       id: Number(c.id),
       question_id: Number(c.question_id),
-      choice_text: c.text || c.label || c.choice_text,
+      choice_text: c.choice_text || c.text || c.label,
       is_correct: Boolean(c.is_correct),
     }));
 
@@ -161,7 +160,6 @@ export const ExamTakingService = {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-
       const attempt = await AttemptRepository.create(
         client,
         studentId,
@@ -169,25 +167,22 @@ export const ExamTakingService = {
         grading.score,
         grading.total_points,
       );
-
-      for (const detail of grading.details) {
+      for (const line of grading.correction) {
         await AnswerRepository.create(
           client,
-          attempt.id,
-          detail.question_id,
-          detail.selected_choice_id,
+          attempt.id!,
+          line.question_id,
+          line.student_choice_id,
+          line.is_correct,
+          line.is_correct ? line.points : 0,
         );
       }
 
       await client.query("COMMIT");
-
       return {
-        attempt_id: attempt.id,
-        exam_id: examId,
         score: grading.score,
         total_points: grading.total_points,
-        submitted_at: attempt.submitted_at,
-        details: grading.details,
+        correction: grading.correction,
       };
     } catch (err) {
       await client.query("ROLLBACK");
