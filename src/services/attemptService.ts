@@ -1,6 +1,6 @@
-// src/services/attemptService.ts
 import { pool } from "../config/database";
 import { ApiError } from "../utils/ApiError";
+import { gradeExam, SubmittedAnswer } from "../utils/graderExam";
 
 export interface SubmitAnswerDTO {
   question_id: number;
@@ -14,24 +14,19 @@ export class AttemptService {
     submittedAnswers: SubmitAnswerDTO[],
   ) {
     const client = await pool.connect();
-
     try {
       await client.query("BEGIN");
-
-      // 1. Vérifier si l'examen existe et si la fenêtre est ouverte
       const examRes = await client.query(
         "SELECT id, starts_at, ends_at FROM exams WHERE id = $1",
         [examId],
       );
       if (examRes.rows.length === 0) throw ApiError.notFound("Exam not found");
-
       const exam = examRes.rows[0];
       const now = new Date();
       if (now < new Date(exam.starts_at) || now > new Date(exam.ends_at)) {
         throw ApiError.forbidden("Exam is not available");
       }
 
-      // 2. Vérifier si l'étudiant n'a pas déjà soumis (RG-02)
       const attemptCheck = await client.query(
         "SELECT id FROM attempts WHERE student_id = $1 AND exam_id = $2",
         [studentId, examId],
@@ -40,70 +35,42 @@ export class AttemptService {
         throw ApiError.conflict("Exam already taken");
       }
 
-      // 3. Charger toutes les questions et leurs choix corrects
       const questionsRes = await client.query(
-        `
-        SELECT q.id as question_id, q.statement, q.points, q.position,
-               c.id as correct_choice_id
-        FROM questions q
-        JOIN choices c ON c.question_id = q.id
-        WHERE q.exam_id = $1 AND c.is_correct = true
-        ORDER BY q.position ASC
-      `,
+        `SELECT id, question_text, points FROM questions WHERE exam_id = $1 ORDER BY position ASC`,
+        [examId],
+      );
+      const questions = questionsRes.rows;
+
+      const choicesRes = await client.query(
+        `SELECT c.id, c.question_id, c.choice_text as text, c.is_correct 
+         FROM choices c 
+         JOIN questions q ON q.id = c.question_id 
+         WHERE q.exam_id = $1`,
         [examId],
       );
 
-      const questions = questionsRes.rows;
-      let totalPoints = 0;
-      let studentScore = 0;
-      const correction = [];
-
-      // Mappe des réponses fournies par l'étudiant
-      const answersMap = new Map<number, number>();
-      for (const ans of submittedAnswers) {
-        if (answersMap.has(ans.question_id)) {
-          throw ApiError.badRequest(
-            "Duplicate question response in submission",
-          );
+      const choicesByQuestion = new Map<number, any[]>();
+      for (const choice of choicesRes.rows) {
+        if (!choicesByQuestion.has(choice.question_id)) {
+          choicesByQuestion.set(choice.question_id, []);
         }
-        answersMap.set(ans.question_id, ans.choice_id);
+        choicesByQuestion.get(choice.question_id)!.push(choice);
       }
 
-      // 4. Évaluer chaque question
-      for (const q of questions) {
-        totalPoints += q.points;
-        const studentChoiceId = answersMap.get(q.question_id) ?? null;
-        const isCorrect = studentChoiceId === q.correct_choice_id;
+      const gradingResult = gradeExam(
+        questions,
+        choicesByQuestion,
+        submittedAnswers as SubmittedAnswer[],
+      );
 
-        if (isCorrect) {
-          studentScore += q.points;
-        }
-
-        correction.push({
-          question_id: q.question_id,
-          statement: q.statement,
-          points: q.points,
-          student_choice_id: studentChoiceId,
-          correct_choice_id: q.correct_choice_id,
-          is_correct: isCorrect,
-        });
-      }
-
-      // 5. Enregistrer la tentative en base
       await client.query(
         `INSERT INTO attempts (student_id, exam_id, score, total_points, submitted_at)
          VALUES ($1, $2, $3, $4, NOW())`,
-        [studentId, examId, studentScore, totalPoints],
+        [studentId, examId, gradingResult.score, gradingResult.total_points],
       );
 
       await client.query("COMMIT");
-
-      // 6. Retourner la réponse exactement comme décrite dans OpenAPI
-      return {
-        score: studentScore,
-        total_points: totalPoints,
-        correction,
-      };
+      return gradingResult;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

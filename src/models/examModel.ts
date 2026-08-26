@@ -24,3 +24,15 @@ export interface Exam {
   created_at?: Date;
   questions?: Question[];
 }
+
+export interface ExamAttempt {
+  id?: number;
+  exam_id: number;
+  student_id: number;
+  tab_switch_count: number;
+  penalty_points: number;
+  raw_score: number;
+  final_score_over_20: number;
+  is_submitted: boolean;
+  submitted_at?: Date | string;
+}

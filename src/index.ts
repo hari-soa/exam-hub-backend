@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import studentRoutes from "./routes/studentRoutes";
-import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
+import { errorHandler, notFoundHandler } from "./security/errorHandler";
 
 dotenv.config();
 

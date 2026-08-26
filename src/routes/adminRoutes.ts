@@ -2,13 +2,12 @@ import { Router } from "express";
 import { AdminStudentController } from "../controllers/adminStudentController";
 import { AdminCourseController } from "../controllers/adminCourseController";
 import { AdminExamController } from "../controllers/adminExamController";
-import { authenticateToken, requireRole } from "../middlewares/authMiddleware";
+import { authenticateToken, requireRole } from "../middlewares/authMiddleWare";
 
 const router = Router();
 
 router.use(authenticateToken, requireRole("admin"));
 
-// Student Management
 router.get("/students", AdminStudentController.listStudents);
 router.post("/students", AdminStudentController.createStudent);
 router.put("/students/:id", AdminStudentController.updateStudent);

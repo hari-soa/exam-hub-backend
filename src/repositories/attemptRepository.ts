@@ -87,6 +87,30 @@ export const AttemptRepository = {
     return rows[0];
   },
 
+  async create(
+    client: PoolClient,
+    studentId: number,
+    examId: number,
+    rawScore: number,
+    totalPoints: number,
+    tabSwitchCount: number = 0,
+    penaltyPoints: number = 0,
+  ): Promise<ExamAttempt> {
+    const finalScore = Math.max(
+      0,
+      (rawScore / (totalPoints || 1)) * 20 - penaltyPoints,
+    );
+    return this.createAttempt(client, {
+      exam_id: examId,
+      student_id: studentId,
+      tab_switch_count: tabSwitchCount,
+      penalty_points: penaltyPoints,
+      raw_score: rawScore,
+      final_score_over_20: Math.round(finalScore * 100) / 100,
+      is_submitted: true,
+    });
+  },
+
   async incrementTabSwitch(
     attemptId: number,
     studentId: number,

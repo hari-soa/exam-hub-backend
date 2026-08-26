@@ -2,7 +2,7 @@ import { Router } from "express";
 import { StudentExamController } from "../controllers/studentExamController";
 import { StudentHistoryController } from "../controllers/studentHistoryController";
 import { AttemptController } from "../controllers/attemptController";
-import { authenticateToken, requireRole } from "../middlewares/authMiddleware";
+import { authenticateToken, requireRole } from "../middlewares/authMiddleWare";
 
 const router = Router();
 

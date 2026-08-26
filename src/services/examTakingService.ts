@@ -6,7 +6,7 @@ import { AttemptRepository } from "../repositories/attemptRepository";
 import { AnswerRepository } from "../repositories/answerRepository";
 import { ApiError } from "../utils/ApiError";
 import { Exam, Question, Choice } from "../models/examModel";
-import { gradeExam, SubmittedAnswer } from "./studentExamService";
+import { gradeExam, SubmittedAnswer } from "../utils/graderExam";
 
 export interface QuestionForStudent {
   id: number;
