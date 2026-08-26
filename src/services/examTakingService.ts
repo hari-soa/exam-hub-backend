@@ -4,7 +4,7 @@ import { QuestionRepository } from "../repositories/questionRepository";
 import { ChoiceRepository } from "../repositories/choiceRepository";
 import { AttemptRepository } from "../repositories/attemptRepository";
 import { AnswerRepository } from "../repositories/answerRepository";
-import { ApiError } from "../middlewares/ApiError";
+import { ApiError } from "../utils/ApiError";
 import { Exam, Question, Choice } from "../models/examModel";
 import { gradeExam, SubmittedAnswer } from "./studentExamService";
 

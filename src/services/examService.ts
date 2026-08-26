@@ -1,6 +1,6 @@
 import { ExamRepository } from "../repositories/examRepository";
 import { Exam } from "../models/examModel";
-import { ApiError } from "../middlewares/ApiError";
+import { ApiError } from "../utils/ApiError";
 
 export const getAvailableExamsForStudent = async (
   _studentId: number,

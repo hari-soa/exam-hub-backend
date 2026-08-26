@@ -1,7 +1,7 @@
 import { AttemptRepository } from "../repositories/attemptRepository";
 import { ExamRepository } from "../repositories/examRepository";
 import { AnswerRepository } from "../repositories/answerRepository";
-import { ApiError } from "../middlewares/ApiError";
+import { ApiError } from "../utils/ApiError";
 
 export const getStudentResults = async (studentId: number) => {
   return await AttemptRepository.findByStudentId(studentId);
