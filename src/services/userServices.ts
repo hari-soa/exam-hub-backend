@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import * as userRepository from "../repositories/userRepository";
-import { User, CreateUserDTO, UpdateUserDTO } from "../models";
+import { User, CreateUserDTO, UpdateUserDTO } from "../models/userModel";
 import { ApiError } from "../utils/ApiError";
 
 export const getAllStudents = async (): Promise<User[]> => {

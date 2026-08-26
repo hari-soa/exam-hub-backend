@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express";
-import * as examService from "../services/examService";
-import * as attemptService from "../services/attemptService";
+import * as rawExamService from "../services/examService";
+import * as rawAttemptService from "../services/attemptService";
+
+const examService = (rawExamService.ExamService || rawExamService) as any;
+const attemptService = (rawAttemptService.AttemptService ||
+  rawAttemptService) as any;
 
 export const StudentExamController = {
   async listAvailable(
@@ -19,7 +23,7 @@ export const StudentExamController = {
 
   async getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const examId = parseInt(req.params.id, 10);
+      const examId = parseInt(req.params.id as string, 10);
       const examDetails = await examService.getExamForStudent(examId);
       res.status(200).json(examDetails);
     } catch (error) {
@@ -29,7 +33,7 @@ export const StudentExamController = {
 
   async submit(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const examId = parseInt(req.params.id, 10);
+      const examId = parseInt(req.params.id as string, 10);
       const studentId = (req as any).user.id;
       const { answers, tab_switch_count } = req.body;
 

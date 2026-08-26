@@ -6,35 +6,41 @@ import { AnswerRepository } from "../repositories/answerRepository";
 import { pool } from "../config/database";
 
 export const StudentHistoryService = {
-  async getStudentHistory(studentId: string) {
-    const attempts = await AttemptRepository.findByStudentId(studentId);
-    if (attempts.length === 0) return [];
+  async getStudentHistory(studentId: string | number) {
+    const numericStudentId = Number(studentId);
+    const attempts = await AttemptRepository.findByStudentId(numericStudentId);
+    if (!attempts || attempts.length === 0) return [];
 
     const results = [];
-    for (const attempt of attempts) {
-      const examId = String(attempt.exam_id);
-      const examIdNumber = Number(examId);
-      const exam = await ExamRepository.findByIdWithQuestions(examId);
+    for (const attempt of attempts as any[]) {
+      const examIdNumber = Number(attempt.exam_id);
+      const exam = await ExamRepository.findByIdWithQuestions(examIdNumber);
       const rawQuestions = await QuestionRepository.findByExamId(examIdNumber);
+
       const questions = rawQuestions.map((q: any) => ({
         id: String(q.id),
-        prompt: q.prompt || q.statement,
+        numericId: Number(q.id),
+        prompt: q.prompt || q.statement || q.question_text,
         points: Number(q.points),
       }));
 
       const rawChoices = await ChoiceRepository.findByQuestionIds(
-        questions.map((q) => q.id),
+        questions.map((q) => q.numericId),
       );
+
       const choices = rawChoices.map((c: any) => ({
         id: String(c.id),
         question_id: String(c.question_id),
-        text: c.text || c.label,
+        text: c.text || c.label || c.choice_text,
         is_correct: Boolean(c.is_correct),
       }));
 
-      const answers = await AnswerRepository.findByAttemptId(attempt.id);
+      const answers = attempt.id
+        ? await AnswerRepository.findByAttemptId(attempt.id)
+        : [];
+
       const answerByQuestion = new Map(
-        answers.map((a: any) => [
+        (answers as any[]).map((a: any) => [
           String(a.question_id),
           a.choice_id ? String(a.choice_id) : null,
         ]),
@@ -63,9 +69,9 @@ export const StudentHistoryService = {
       results.push({
         attempt_id: attempt.id,
         exam_id: attempt.exam_id,
-        exam_title: exam?.title ?? "Deleted exam",
-        score: Number(attempt.score),
-        total_points: Number(attempt.total_points),
+        exam_title: (exam as any)?.title ?? "Deleted exam",
+        score: Number(attempt.score ?? 0),
+        total_points: Number(attempt.total_points ?? 0),
         submitted_at: attempt.submitted_at,
         details,
       });
@@ -74,24 +80,24 @@ export const StudentHistoryService = {
     return results;
   },
 
-  async getExamResults(examId: string) {
+  async getExamResults(examId: string | number) {
     const query = `
-            SELECT 
-                a.id AS attempt_id,
-                a.exam_id,
-                a.student_id,
-                a.score,
-                a.total_points,
-                a.submitted_at,
-                u.first_name,
-                u.last_name,
-                u.email
-            FROM exam_attempts a
-            JOIN users u ON a.student_id = u.id
-            WHERE a.exam_id = $1
-            ORDER BY a.submitted_at DESC;
-        `;
-    const { rows } = await pool.query(query, [examId]);
+      SELECT 
+        a.id AS attempt_id,
+        a.exam_id,
+        a.student_id,
+        a.score,
+        a.total_points,
+        a.submitted_at,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM exam_attempts a
+      JOIN users u ON a.student_id = u.id
+      WHERE a.exam_id = $1
+      ORDER BY a.submitted_at DESC;
+    `;
+    const { rows } = await pool.query(query, [Number(examId)]);
     return rows;
   },
 };

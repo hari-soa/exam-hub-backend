@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import * as userService from "../services/userService";
+import * as rawUserService from "../services/userServices";
+
+const userService = rawUserService as any;
 
 export const AdminStudentController = {
   async listStudents(
@@ -47,7 +49,7 @@ export const AdminStudentController = {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const studentId = parseInt(req.params.id, 10);
+      const studentId = parseInt(req.params.id as string, 10);
       const updatedStudent = await userService.updateStudentProfile(
         studentId,
         req.body,
@@ -57,13 +59,14 @@ export const AdminStudentController = {
       next(error);
     }
   },
+
   async deactivateStudent(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const studentId = parseInt(req.params.id, 10);
+      const studentId = parseInt(req.params.id as string, 10);
       await userService.deactivateStudentAccount(studentId);
       res
         .status(200)

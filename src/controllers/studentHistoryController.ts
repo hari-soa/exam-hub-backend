@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import * as attemptService from "../services/attemptService";
+import * as rawAttemptService from "../services/attemptService";
+
+const attemptService = (rawAttemptService.AttemptService ||
+  rawAttemptService) as any;
 
 export const StudentHistoryController = {
   async getHistory(

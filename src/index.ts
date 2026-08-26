@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
@@ -10,12 +10,13 @@ import { errorHandler, notFoundHandler } from "./security/errorHandler";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = Number(process.env.PORT);
 const clientUrl = process.env.CLIENT_URL;
+
 app.use(cors({ origin: clientUrl, credentials: true }));
 app.use(express.json());
 
-app.get("/", (_req, res) => {
+app.get("/", (_req: Request, res: Response) => {
   res.send("Exam Hub API running.");
 });
 

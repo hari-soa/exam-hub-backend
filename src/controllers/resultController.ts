@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import * as resultService from "../services/resultService";
+import * as rawResultService from "../services/resultService";
+
+const resultService = rawResultService as any;
 
 export const ResultController = {
   async getStudentHistory(
@@ -22,7 +24,7 @@ export const ResultController = {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const attemptId = parseInt(req.params.attemptId, 10);
+      const attemptId = parseInt(req.params.attemptId as string, 10);
       const studentId = (req as any).user.id;
 
       const resultDetails = await resultService.getDetailedResultForStudent(
@@ -41,7 +43,7 @@ export const ResultController = {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const examId = parseInt(req.params.examId, 10);
+      const examId = parseInt(req.params.examId as string, 10);
       const adminResults = await resultService.getExamResultsForAdmin(examId);
       res.status(200).json(adminResults);
     } catch (error) {

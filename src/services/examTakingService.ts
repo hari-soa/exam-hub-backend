@@ -158,9 +158,10 @@ export const ExamTakingService = {
     const grading = gradeExam(questions, choicesByQuestion, sanitizedAnswers);
 
     const client = await pool.connect();
+    const attemptRepo = AttemptRepository as any;
+    const answerRepo = AnswerRepository as any;
     try {
-      await client.query("BEGIN");
-      const attempt = await AttemptRepository.create(
+      const attempt = await attemptRepo.create(
         client,
         studentId,
         examId,
@@ -168,7 +169,7 @@ export const ExamTakingService = {
         grading.total_points,
       );
       for (const line of grading.correction) {
-        await AnswerRepository.create(
+        await answerRepo.create(
           client,
           attempt.id!,
           line.question_id,
@@ -177,7 +178,6 @@ export const ExamTakingService = {
           line.is_correct ? line.points : 0,
         );
       }
-
       await client.query("COMMIT");
       return {
         score: grading.score,
