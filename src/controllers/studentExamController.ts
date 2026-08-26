@@ -1,41 +1,52 @@
-import { Request, Response } from "express";
-import { ExamTakingService } from "../services/examTakingService";
-import { asyncHandler } from "../middlewares/errorHandler";
-import { ApiError } from "../middlewares/ApiError";
+import { Request, Response, NextFunction } from "express";
+import * as rawExamService from "../services/examService";
+import * as rawAttemptService from "../services/attemptService";
+
+const examService = (rawExamService.ExamService || rawExamService) as any;
+const attemptService = (rawAttemptService.AttemptService ||
+  rawAttemptService) as any;
 
 export const StudentExamController = {
-    listAvailable: asyncHandler(async (req: Request, res: Response) => {
-        const studentId = req.user?.id;
-        if (!studentId) throw ApiError.unauthorized("Unauthorized");
+  async listAvailable(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const studentId = (req as any).user.id;
+      const exams = await examService.getAvailableExamsForStudent(studentId);
+      res.status(200).json(exams);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-        const exams = await ExamTakingService.listAvailable(studentId);
-        res.json(exams);
-    }),
+  async getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const examId = parseInt(req.params.id as string, 10);
+      const examDetails = await examService.getExamForStudent(examId);
+      res.status(200).json(examDetails);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    getOne: asyncHandler(async (req: Request, res: Response) => {
-        const studentId = req.user?.id;
-        if (!studentId) throw ApiError.unauthorized("Unauthorized");
+  async submit(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const examId = parseInt(req.params.id as string, 10);
+      const studentId = (req as any).user.id;
+      const { answers, tab_switch_count } = req.body;
 
-        const examId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        if (!examId) throw ApiError.badRequest("Invalid exam ID");
+      const result = await attemptService.submitExamAttempt({
+        exam_id: examId,
+        student_id: studentId,
+        answers,
+        tab_switch_count: tab_switch_count || 0,
+      });
 
-        const result = await ExamTakingService.getExamForStudent(studentId, examId);
-        res.json(result);
-    }),
-
-    submit: asyncHandler(async (req: Request, res: Response) => {
-        const studentId = req.user?.id;
-        if (!studentId) throw ApiError.unauthorized("Unauthorized");
-
-        const examId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-        if (!examId) throw ApiError.badRequest("Invalid exam ID");
-
-        const { answers } = req.body;
-        if (!Array.isArray(answers)) {
-            throw ApiError.badRequest("Answers must be an array");
-        }
-
-        const result = await ExamTakingService.submit(studentId, examId, answers);
-        res.status(201).json(result);
-    }),
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
 };

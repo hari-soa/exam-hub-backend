@@ -1,27 +1,30 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
+import dotenv from "dotenv";
+
 import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import studentRoutes from "./routes/studentRoutes";
-import { errorHandler } from "./security/errorMiddleware";
+import { errorHandler, notFoundHandler } from "./security/errorHandler";
+
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = Number(process.env.PORT);
 const clientUrl = process.env.CLIENT_URL;
 
 app.use(cors({ origin: clientUrl, credentials: true }));
 app.use(express.json());
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
 
-app.get("/", (req, res) => {
-  res.send("Exam Hub API is working!");
+app.get("/", (_req: Request, res: Response) => {
+  res.send("Exam Hub API running.");
 });
 
-app.use(authRoutes);
-app.use(adminRoutes);
-app.use(studentRoutes);
+app.use("/api", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/student", studentRoutes);
 
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 app.listen(PORT, () => {

@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import bcrypt from "bcrypt";
-import { pool } from "../configuration/database";
+import { pool } from "../config/database";
 import * as userRepository from "../repositories/userRepository";
 
 const seedAdmin = async () => {

@@ -1,4 +1,4 @@
-import { pool } from "../configuration/database";
+import { pool } from "../config/database";
 import { User } from "../models/userModel";
 
 export const findUserByEmail = async (
@@ -11,15 +11,17 @@ export const findUserByEmail = async (
   return result.rows[0];
 };
 
-export const findUserByIdentifier = async (identifier: string) => {
+export const findUserByIdentifier = async (
+  identifier: string,
+): Promise<User | undefined> => {
   const result = await pool.query(
-    `SELECT * FROM users WHERE email = $1 OR matricule = $1`,
+    `SELECT * FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(matricule) = LOWER($1)`,
     [identifier],
   );
-  return result.rows[0] || null;
+  return result.rows[0];
 };
 
-export const findUserById = async (id: string): Promise<User | undefined> => {
+export const findUserById = async (id: number): Promise<User | undefined> => {
   const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
   return result.rows[0];
 };
@@ -48,7 +50,7 @@ export const findAllStudents = async (): Promise<User[]> => {
 };
 
 export const updateUser = async (
-  id: string,
+  id: number,
   user: Partial<Pick<User, "first_name" | "last_name" | "email">>,
 ): Promise<User | undefined> => {
   const { first_name, last_name, email } = user;
@@ -65,7 +67,7 @@ export const updateUser = async (
 };
 
 export const updatePassword = async (
-  id: string,
+  id: number,
   hashedPassword: string,
 ): Promise<void> => {
   await pool.query("UPDATE users SET password = $1 WHERE id = $2", [
@@ -74,7 +76,7 @@ export const updatePassword = async (
   ]);
 };
 
-export const deactivateUser = async (id: string): Promise<boolean> => {
+export const deactivateUser = async (id: number): Promise<boolean> => {
   const result = await pool.query(
     "UPDATE users SET is_active = false WHERE id = $1 AND role = 'student' RETURNING id",
     [id],

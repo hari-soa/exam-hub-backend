@@ -1,4 +1,5 @@
 import { JwtPayload } from "jsonwebtoken";
+import { JwtPayload } from "../security/jwt";
 
 declare global {
   namespace Express {

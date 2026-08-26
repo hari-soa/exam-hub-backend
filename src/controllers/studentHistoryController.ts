@@ -1,14 +1,21 @@
-import { Request, Response } from "express";
-import { StudentHistoryService } from "../services/studentHistoryService";
-import { asyncHandler } from "../middlewares/errorHandler";
-import { ApiError } from "../middlewares/ApiError";
+import { Request, Response, NextFunction } from "express";
+import * as rawAttemptService from "../services/attemptService";
+
+const attemptService = (rawAttemptService.AttemptService ||
+  rawAttemptService) as any;
 
 export const StudentHistoryController = {
-    getHistory: asyncHandler(async (req: Request, res: Response) => {
-        const studentId = req.user?.id;
-        if (!studentId) throw ApiError.unauthorized("Unauthorized");
-
-        const history = await StudentHistoryService.getStudentHistory(studentId);
-        res.json(history);
-    }),
+  async getHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const studentId = (req as any).user.id;
+      const history = await attemptService.getStudentAttemptHistory(studentId);
+      res.status(200).json(history);
+    } catch (error) {
+      next(error);
+    }
+  },
 };
