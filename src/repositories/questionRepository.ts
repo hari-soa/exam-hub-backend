@@ -8,12 +8,23 @@ export interface QuestionData {
   points: number;
 }
 
+export interface ChoiceData {
+  choice_text: string;
+  is_correct: boolean;
+}
+
 export interface IQuestionRepository {
   findById(id: number): Promise<Question | null>;
   findByExamId(examId: number): Promise<Question[]>;
   create(data: QuestionData, client?: PoolClient): Promise<Question>;
+  createQuestionWithChoices(
+    examId: number,
+    questionText: string,
+    points: number,
+    choices: ChoiceData[],
+  ): Promise<Question>;
   update(id: number, data: Partial<QuestionData>): Promise<Question | null>;
-  delete(id: number): Promise<void>;
+  delete(id: number): Promise<boolean>;
 }
 
 export const QuestionRepository: IQuestionRepository = {
@@ -44,6 +55,42 @@ export const QuestionRepository: IQuestionRepository = {
     return rows[0];
   },
 
+  async createQuestionWithChoices(
+    examId: number,
+    questionText: string,
+    points: number,
+    choices: ChoiceData[],
+  ) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const questionResult = await client.query<Question>(
+        `INSERT INTO questions (exam_id, question_text, points)
+         VALUES ($1, $2, $3)
+         RETURNING *;`,
+        [examId, questionText, points],
+      );
+      const question = questionResult.rows[0];
+
+      for (const choice of choices) {
+        await client.query(
+          `INSERT INTO choices (question_id, choice_text, is_correct)
+           VALUES ($1, $2, $3);`,
+          [question.id, choice.choice_text, choice.is_correct],
+        );
+      }
+
+      await client.query("COMMIT");
+      return question;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
   async update(id: number, data: Partial<QuestionData>) {
     const { rows } = await pool.query<Question>(
       `UPDATE questions
@@ -57,6 +104,9 @@ export const QuestionRepository: IQuestionRepository = {
   },
 
   async delete(id: number) {
-    await pool.query("DELETE FROM questions WHERE id = $1;", [id]);
+    const result = await pool.query("DELETE FROM questions WHERE id = $1;", [
+      id,
+    ]);
+    return (result.rowCount ?? 0) > 0;
   },
 };
