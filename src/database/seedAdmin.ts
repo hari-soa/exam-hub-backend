@@ -1,40 +1,34 @@
-import dotenv from "dotenv";
+// src/database/seedAdmin.ts
+import { pool } from '../config/database';
+import dotenv from 'dotenv';
+
 dotenv.config();
 
-import bcrypt from "bcrypt";
-import { pool } from "../config/database";
-import * as userRepository from "../repositories/userRepository";
-
-const seedAdmin = async () => {
+async function seed() {
   try {
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminEmail || !adminPassword) {
-      throw new Error("ADMIN_EMAIL or ADMIN_PASSWORD is missing in .env file");
-    }
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    const existingAdmin = await userRepository.findUserByEmail(adminEmail);
-    if (!existingAdmin) {
-      await pool.query(
-        `INSERT INTO users (first_name, last_name, email, password, role, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        ["System", "Admin", adminEmail, hashedPassword, "admin", true],
-      );
-      console.log(`Admin account created successfully (${adminEmail}).`);
-    } else {
-      await pool.query(
-        `UPDATE users 
-         SET password = $1, is_active = true 
-         WHERE email = $2`,
-        [hashedPassword, adminEmail],
-      );
-      console.log(`Admin password and status updated for ${adminEmail}.`);
-    }
-  } catch (error) {
-    console.error("Error seeding admin:", error);
-  } finally {
-    await pool.end();
-  }
-};
+    const email = process.env.ADMIN_EMAIL || 'admin@examhub.com';
+    const password = process.env.ADMIN_PASSWORD || 'Admin123!';
 
-seedAdmin();
+    const checkQuery = 'SELECT * FROM users WHERE email = $1';
+    const existing = await pool.query(checkQuery, [email]);
+
+    if (existing.rows.length > 0) {
+      console.log('Admin user already exists.');
+      process.exit(0);
+    }
+
+    const insertQuery = `
+      INSERT INTO users (first_name, last_name, email, password, role, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `;
+    await pool.query(insertQuery, ['Super', 'Admin', email, password, 'admin', true]);
+
+    console.log('Admin user created successfully.');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error seeding admin user:', error);
+    process.exit(1);
+  }
+}
+
+seed();

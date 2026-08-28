@@ -1,23 +1,19 @@
-import jwt from "jsonwebtoken";
-
-export type UserRole = "admin" | "student";
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 export interface JwtPayload {
-  id: string;
+  id: number;
+  role: 'admin' | 'student';
   email: string;
-  role: "admin" | "student";
-  name?: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
+const JWT_SECRET: string = process.env.JWT_SECRET || 'votre_secret_key';
+const JWT_EXPIRES_IN: SignOptions['expiresIn'] = (process.env.JWT_EXPIRES_IN as SignOptions['expiresIn']) || '24h';
 
-export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  } as jwt.SignOptions);
-}
+export const generateToken = (payload: JwtPayload): string => {
+  const options: SignOptions = { expiresIn: JWT_EXPIRES_IN };
+  return jwt.sign(payload, JWT_SECRET, options);
+};
 
-export function verifyToken(token: string): JwtPayload {
+export const verifyToken = (token: string): JwtPayload => {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
-}
+};

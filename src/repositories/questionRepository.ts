@@ -1,62 +1,45 @@
-import { PoolClient } from "pg";
-import { pool } from "../config/database";
-import { Question } from "../models/examModel";
+// src/repositories/questionRepository.ts
+import { pool } from '../config/database';
 
-export interface QuestionData {
-  exam_id: number;
-  question_text: string;
-  points: number;
+export class QuestionRepository {
+  static async findByExamId(examId: number, includeCorrect: boolean = true) {
+    const questionsQuery = 'SELECT * FROM questions WHERE exam_id = $1 ORDER BY id ASC';
+    const qResult = await pool.query(questionsQuery, [examId]);
+    const questions = qResult.rows;
+
+    for (const q of questions) {
+      let choicesQuery = 'SELECT id, choice_text FROM choices WHERE question_id = $1 ORDER BY id ASC';
+      if (includeCorrect) {
+        choicesQuery = 'SELECT id, choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY id ASC';
+      }
+      const cResult = await pool.query(choicesQuery, [q.id]);
+      q.choices = cResult.rows;
+    }
+
+    return questions;
+  }
+
+  static async createQuestion(examId: number, questionText: string, points: number) {
+    const query = 'INSERT INTO questions (exam_id, question_text, points) VALUES ($1, $2, $3) RETURNING *';
+    const result = await pool.query(query, [examId, questionText, points]);
+    return result.rows[0];
+  }
+
+  static async createChoice(questionId: number, choiceText: string, isCorrect: boolean) {
+    const query = 'INSERT INTO choices (question_id, choice_text, is_correct) VALUES ($1, $2, $3) RETURNING *';
+    const result = await pool.query(query, [questionId, choiceText, isCorrect]);
+    return result.rows[0];
+  }
+
+  static async deleteQuestion(questionId: number) {
+    const query = 'DELETE FROM questions WHERE id = $1 RETURNING id';
+    const result = await pool.query(query, [questionId]);
+    return result.rows[0];
+  }
+
+  static async findQuestionById(questionId: number) {
+    const query = 'SELECT * FROM questions WHERE id = $1';
+    const result = await pool.query(query, [questionId]);
+    return result.rows[0];
+  }
 }
-
-export interface IQuestionRepository {
-  findById(id: number): Promise<Question | null>;
-  findByExamId(examId: number): Promise<Question[]>;
-  create(data: QuestionData, client?: PoolClient): Promise<Question>;
-  update(id: number, data: Partial<QuestionData>): Promise<Question | null>;
-  delete(id: number): Promise<void>;
-}
-
-export const QuestionRepository: IQuestionRepository = {
-  async findById(id: number) {
-    const { rows } = await pool.query<Question>(
-      "SELECT * FROM questions WHERE id = $1;",
-      [id],
-    );
-    return rows[0] || null;
-  },
-
-  async findByExamId(examId: number) {
-    const { rows } = await pool.query<Question>(
-      "SELECT * FROM questions WHERE exam_id = $1 ORDER BY id ASC;",
-      [examId],
-    );
-    return rows;
-  },
-
-  async create(data: QuestionData, client?: PoolClient) {
-    const dbClient = client || pool;
-    const { rows } = await dbClient.query<Question>(
-      `INSERT INTO questions (exam_id, question_text, points)
-       VALUES ($1, $2, $3)
-       RETURNING *;`,
-      [data.exam_id, data.question_text, data.points],
-    );
-    return rows[0];
-  },
-
-  async update(id: number, data: Partial<QuestionData>) {
-    const { rows } = await pool.query<Question>(
-      `UPDATE questions
-       SET question_text = COALESCE($1, question_text),
-           points = COALESCE($2, points)
-       WHERE id = $3
-       RETURNING *;`,
-      [data.question_text, data.points, id],
-    );
-    return rows[0] || null;
-  },
-
-  async delete(id: number) {
-    await pool.query("DELETE FROM questions WHERE id = $1;", [id]);
-  },
-};

@@ -1,22 +1,14 @@
-import { Router } from "express";
-import { StudentExamController } from "../controllers/studentExamController";
-import { StudentHistoryController } from "../controllers/studentHistoryController";
-import { AttemptController } from "../controllers/attemptController";
-import { authenticateToken, requireRole } from "../middlewares/authMiddleWare";
+import express from 'express';
+import { StudentController } from '../controllers/studentController';
+import { authenticateToken, requireAdmin } from '../security/authMiddleware';
 
-const router = Router();
+const router = express.Router();
 
-router.use(authenticateToken, requireRole("student"));
-
-router.get("/my/exams", StudentExamController.listAvailable);
-router.get("/my/exams/:id", StudentExamController.getOne);
-router.get("/my/results", StudentHistoryController.getHistory);
-
-router.post("/exams/:examId/start", AttemptController.startAttempt);
-router.patch(
-  "/attempts/:attemptId/tab-switch",
-  AttemptController.recordTabSwitch,
-);
-router.post("/exams/:examId/submit", StudentExamController.submit);
+router.use(authenticateToken);
+router.get('/', requireAdmin, StudentController.getAll);
+router.post('/', requireAdmin, StudentController.create);
+router.put('/:id', requireAdmin, StudentController.update);
+router.put('/:id/reset-password', requireAdmin, StudentController.resetPassword);
+router.delete('/:id', requireAdmin, StudentController.deactivate);
 
 export default router;

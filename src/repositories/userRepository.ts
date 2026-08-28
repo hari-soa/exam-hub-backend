@@ -1,85 +1,74 @@
-import { pool } from "../config/database";
-import { User } from "../models/userModel";
+// src/repositories/userRepository.ts
+import { pool } from '../config/database';
 
-export const findUserByEmail = async (
-  email: string,
-): Promise<User | undefined> => {
-  const result = await pool.query(
-    "SELECT * FROM users WHERE LOWER(email) = LOWER($1)",
-    [email],
-  );
-  return result.rows[0];
-};
+export class UserRepository {
+  static async findAllStudents() {
+    const query = `
+      SELECT id, first_name, last_name, email, matricule, role, is_active, created_at 
+      FROM users 
+      WHERE role = 'student' 
+      ORDER BY id DESC
+    `;
+    const result = await pool.query(query);
+    return result.rows;
+  }
 
-export const findUserByIdentifier = async (
-  identifier: string,
-): Promise<User | undefined> => {
-  const result = await pool.query(
-    `SELECT * FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(matricule) = LOWER($1)`,
-    [identifier],
-  );
-  return result.rows[0];
-};
+  static async findById(id: number) {
+    const query = `
+      SELECT id, first_name, last_name, email, matricule, role, is_active, created_at 
+      FROM users 
+      WHERE id = $1
+    `;
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
 
-export const findUserById = async (id: number): Promise<User | undefined> => {
-  const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
-  return result.rows[0];
-};
+  static async findByEmail(email: string) {
+    const query = 'SELECT * FROM users WHERE email = $1';
+    const result = await pool.query(query, [email]);
+    return result.rows[0];
+  }
 
-export const createUser = async (
-  user: Omit<User, "id" | "is_active" | "created_at">,
-): Promise<User> => {
-  const { first_name, last_name, email, password, role } = user;
-  const result = await pool.query(
-    `INSERT INTO users (first_name, last_name, email, password, role) 
-     VALUES ($1, $2, $3, $4, $5) 
-     RETURNING id, first_name, last_name, email, role, is_active, created_at`,
-    [first_name, last_name, email, password, role],
-  );
-  return result.rows[0];
-};
+  static async createStudent(firstName: string, lastName: string, email: string, matricule: string, hashedPassword: string) {
+    const query = `
+      INSERT INTO users (first_name, last_name, email, matricule, password, role, is_active)
+      VALUES ($1, $2, $3, $4, $5, 'student', true)
+      RETURNING id, first_name, last_name, email, matricule, role, is_active, created_at
+    `;
+    const result = await pool.query(query, [firstName, lastName, email, matricule, hashedPassword]);
+    return result.rows[0];
+  }
 
-export const findAllStudents = async (): Promise<User[]> => {
-  const result = await pool.query(
-    `SELECT id, first_name, last_name, email, role, is_active, created_at 
-     FROM users 
-     WHERE role = 'student' 
-     ORDER BY created_at DESC`,
-  );
-  return result.rows;
-};
+  static async updateStudent(id: number, firstName: string, lastName: string, email: string, matricule: string) {
+    const query = `
+      UPDATE users 
+      SET first_name = $1, last_name = $2, email = $3, matricule = $4 
+      WHERE id = $5 AND role = 'student'
+      RETURNING id, first_name, last_name, email, matricule, role, is_active, created_at
+    `;
+    const result = await pool.query(query, [firstName, lastName, email, matricule, id]);
+    return result.rows[0];
+  }
 
-export const updateUser = async (
-  id: number,
-  user: Partial<Pick<User, "first_name" | "last_name" | "email">>,
-): Promise<User | undefined> => {
-  const { first_name, last_name, email } = user;
-  const result = await pool.query(
-    `UPDATE users 
-     SET first_name = COALESCE($1, first_name), 
-         last_name = COALESCE($2, last_name), 
-         email = COALESCE($3, email) 
-     WHERE id = $4 AND role = 'student'
-     RETURNING id, first_name, last_name, email, role, is_active`,
-    [first_name, last_name, email, id],
-  );
-  return result.rows[0];
-};
+  static async updatePassword(id: number, hashedPassword: string) {
+    const query = `
+      UPDATE users 
+      SET password = $1 
+      WHERE id = $2
+      RETURNING id
+    `;
+    const result = await pool.query(query, [hashedPassword, id]);
+    return result.rows[0];
+  }
 
-export const updatePassword = async (
-  id: number,
-  hashedPassword: string,
-): Promise<void> => {
-  await pool.query("UPDATE users SET password = $1 WHERE id = $2", [
-    hashedPassword,
-    id,
-  ]);
-};
-
-export const deactivateUser = async (id: number): Promise<boolean> => {
-  const result = await pool.query(
-    "UPDATE users SET is_active = false WHERE id = $1 AND role = 'student' RETURNING id",
-    [id],
-  );
-  return (result.rowCount ?? 0) > 0;
-};
+  static async deactivate(id: number) {
+    const query = `
+      UPDATE users 
+      SET is_active = false 
+      WHERE id = $1 AND role = 'student'
+      RETURNING id, is_active
+    `;
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
+}

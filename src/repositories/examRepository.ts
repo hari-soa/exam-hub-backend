@@ -1,73 +1,86 @@
-import { pool } from "../config/database";
-import { Exam } from "../models/examModel";
+// src/repositories/examRepository.ts
+import { pool } from '../config/database';
 
-export const ExamRepository = {
-  async findAll(): Promise<Exam[]> {
-    const query = `SELECT id, course_id, title, description, start_time, end_time, duration_minutes FROM exams`;
-    const result = await pool.query<Exam>(query);
+export class ExamRepository {
+  static async findAll() {
+    const query = `
+      SELECT e.*, c.name as course_name, c.code as course_code 
+      FROM exams e 
+      JOIN courses c ON e.course_id = c.id 
+      ORDER BY e.id DESC
+    `;
+    const result = await pool.query(query);
     return result.rows;
-  },
+  }
 
-  async findByIdWithQuestions(examId: number): Promise<any> {
-    const examQuery = `SELECT id, course_id, title, description, start_time, end_time, duration_minutes FROM exams WHERE id = $1`;
-    const examResult = await pool.query(examQuery, [examId]);
-    if (examResult.rows.length === 0) return null;
+  static async findById(id: number) {
+    const query = `
+      SELECT e.*, c.name as course_name, c.code as course_code 
+      FROM exams e 
+      JOIN courses c ON e.course_id = c.id 
+      WHERE e.id = $1
+    `;
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
 
-    const questionsQuery = `SELECT id, exam_id, question_text, points FROM questions WHERE exam_id = $1`;
-    const questionsResult = await pool.query(questionsQuery, [examId]);
+  static async create(courseId: number, title: string, description: string, startTime: string, endTime: string, durationMinutes: number) {
+    const query = `
+      INSERT INTO exams (course_id, title, description, start_time, end_time, duration_minutes)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `;
+    const result = await pool.query(query, [courseId, title, description, startTime, endTime, durationMinutes]);
+    return result.rows[0];
+  }
 
-    const questions = [];
-    for (const q of questionsResult.rows) {
-      const choicesQuery = `SELECT id, question_id, choice_text FROM choices WHERE question_id = $1`;
-      const choicesResult = await pool.query(choicesQuery, [q.id]);
-      questions.push({
-        ...q,
-        choices: choicesResult.rows,
-      });
-    }
+  static async update(id: number, courseId: number, title: string, description: string, startTime: string, endTime: string, durationMinutes: number) {
+    const query = `
+      UPDATE exams 
+      SET course_id = $1, title = $2, description = $3, start_time = $4, end_time = $5, duration_minutes = $6
+      WHERE id = $7
+      RETURNING *
+    `;
+    const result = await pool.query(query, [courseId, title, description, startTime, endTime, durationMinutes, id]);
+    return result.rows[0];
+  }
 
-    return {
-      ...examResult.rows[0],
-      questions,
-    };
-  },
+  static async delete(id: number) {
+    const query = 'DELETE FROM exams WHERE id = $1 RETURNING id';
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
 
-  async findById(id: number) {
-    const { rows } = await pool.query("SELECT * FROM exams WHERE id = $1;", [
-      id,
-    ]);
-    return rows[0] || null;
-  },
+  static async hasAttempts(examId: number) {
+    const query = 'SELECT COUNT(*) FROM exam_attempts WHERE exam_id = $1';
+    const result = await pool.query(query, [examId]);
+    return parseInt(result.rows[0].count, 10) > 0;
+  }
 
-  async create(data: any) {
-    const { rows } = await pool.query(
-      `INSERT INTO exams (course_id, title, description, starts_at, ends_at)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *;`,
-      [
-        data.course_id,
-        data.title,
-        data.description || null,
-        data.starts_at,
-        data.ends_at,
-      ],
-    );
-    return rows[0];
-  },
+  static async findAvailableForStudent(studentId: number) {
+    const query = `
+      SELECT e.*, c.name as course_name, c.code as course_code 
+      FROM exams e 
+      JOIN courses c ON e.course_id = c.id
+      WHERE NOW() BETWEEN e.start_time AND e.end_time
+      AND e.id NOT IN (
+        SELECT exam_id FROM exam_attempts WHERE student_id = $1
+      )
+      ORDER BY e.end_time ASC
+    `;
+    const result = await pool.query(query, [studentId]);
+    return result.rows;
+  }
 
-  async update(id: number, data: any) {
-    const { rows } = await pool.query(
-      `UPDATE exams
-       SET title = COALESCE($1, title),
-           description = COALESCE($2, description),
-           starts_at = COALESCE($3, starts_at),
-           ends_at = COALESCE($4, ends_at)
-       WHERE id = $5 RETURNING *;`,
-      [data.title, data.description, data.starts_at, data.ends_at, id],
-    );
-    return rows[0] || null;
-  },
-
-  async delete(id: number) {
-    await pool.query("DELETE FROM exams WHERE id = $1;", [id]);
-  },
-};
+  static async getExamResults(examId: number) {
+    const query = `
+      SELECT ea.*, u.first_name, u.last_name, u.email, u.matricule
+      FROM exam_attempts ea
+      JOIN users u ON ea.student_id = u.id
+      WHERE ea.exam_id = $1
+      ORDER BY ea.submitted_at DESC
+    `;
+    const result = await pool.query(query, [examId]);
+    return result.rows;
+  }
+}
