@@ -1,8 +1,6 @@
-// src/services/examService.ts
-import { ExamRepository } from '../repositories/examRepository';
-import { QuestionRepository } from '../repositories/questionRepository';
-// ⚠️ Vérifiez et ajustez ce chemin si votre fichier db/database est ailleurs (ex: './database' ou './db')
-import { pool } from '../config/database';
+import { ExamRepository } from "../repositories/examRepository";
+import { QuestionRepository } from "../repositories/questionRepository";
+import { pool } from "../config/database";
 
 export class ExamService {
   static async getAllExams() {
@@ -10,7 +8,7 @@ export class ExamService {
   }
 
   static async getExamsHistory() {
-    if (typeof (ExamRepository as any).findHistory === 'function') {
+    if (typeof (ExamRepository as any).findHistory === "function") {
       return await (ExamRepository as any).findHistory();
     }
     return await ExamRepository.findAll();
@@ -19,7 +17,7 @@ export class ExamService {
   static async getExamById(id: number) {
     const exam = await ExamRepository.findById(id);
     if (!exam) {
-      const error: any = new Error('Exam not found');
+      const error: any = new Error("Exam not found");
       error.status = 404;
       throw error;
     }
@@ -27,28 +25,47 @@ export class ExamService {
     return { ...exam, questions };
   }
 
-  static async createExam(data: { course_id: number; title: string; description?: string; start_time: string; end_time: string; duration_minutes: number }) {
+  static async createExam(data: {
+    course_id: number;
+    title: string;
+    description?: string;
+    start_time: string;
+    end_time: string;
+    duration_minutes: number;
+  }) {
     return await ExamRepository.create(
       data.course_id,
       data.title,
-      data.description || '',
+      data.description || "",
       data.start_time,
       data.end_time,
-      data.duration_minutes
+      data.duration_minutes,
     );
   }
 
-  static async updateExam(id: number, data: { course_id: number; title: string; description?: string; start_time: string; end_time: string; duration_minutes: number }) {
+  static async updateExam(
+    id: number,
+    data: {
+      course_id: number;
+      title: string;
+      description?: string;
+      start_time: string;
+      end_time: string;
+      duration_minutes: number;
+    },
+  ) {
     const exam = await ExamRepository.findById(id);
     if (!exam) {
-      const error: any = new Error('Exam not found');
+      const error: any = new Error("Exam not found");
       error.status = 404;
       throw error;
     }
 
     const hasAttempts = await ExamRepository.hasAttempts(id);
     if (hasAttempts) {
-      const error: any = new Error('Cannot modify exam because it has attempts (RG-08)');
+      const error: any = new Error(
+        "Cannot modify exam because it has attempts (RG-08)",
+      );
       error.status = 409;
       throw error;
     }
@@ -57,24 +74,26 @@ export class ExamService {
       id,
       data.course_id,
       data.title,
-      data.description || '',
+      data.description || "",
       data.start_time,
       data.end_time,
-      data.duration_minutes
+      data.duration_minutes,
     );
   }
 
   static async deleteExam(id: number) {
     const exam = await ExamRepository.findById(id);
     if (!exam) {
-      const error: any = new Error('Exam not found');
+      const error: any = new Error("Exam not found");
       error.status = 404;
       throw error;
     }
 
     const hasAttempts = await ExamRepository.hasAttempts(id);
     if (hasAttempts) {
-      const error: any = new Error('Cannot delete exam because it has attempts (RG-09)');
+      const error: any = new Error(
+        "Cannot delete exam because it has attempts (RG-09)",
+      );
       error.status = 409;
       throw error;
     }
@@ -82,8 +101,10 @@ export class ExamService {
     try {
       return await ExamRepository.delete(id);
     } catch (error: any) {
-      if (error.code === '23503') {
-        const customError: any = new Error('Cannot delete exam due to existing dependencies (RG-09)');
+      if (error.code === "23503") {
+        const customError: any = new Error(
+          "Cannot delete exam due to existing dependencies (RG-09)",
+        );
         customError.status = 409;
         throw customError;
       }
@@ -94,36 +115,45 @@ export class ExamService {
   static async getExamResults(examId: number) {
     const exam = await ExamRepository.findById(examId);
     if (!exam) {
-      const error: any = new Error('Exam not found');
+      const error: any = new Error("Exam not found");
       error.status = 404;
       throw error;
     }
 
     const attempts = await ExamRepository.getExamResults(examId);
     let totalScore = 0;
-    attempts.forEach((a: any) => totalScore += parseFloat(a.final_score_over_20));
+    attempts.forEach(
+      (a: any) => (totalScore += parseFloat(a.final_score_over_20)),
+    );
     const average = attempts.length > 0 ? totalScore / attempts.length : 0;
 
     return {
       exam,
       attempts_count: attempts.length,
       average_score: parseFloat(average.toFixed(2)),
-      attempts
+      attempts,
     };
   }
 
-  // Soumission de l'examen et calcul des scores
-  static async submitExam(userId: number, examId: number, answers: Array<{ questionId: number, selectedChoiceId?: number, textAnswer?: string }>) {
+  static async submitExam(
+    userId: number,
+    examId: number,
+    answers: Array<{
+      questionId: number;
+      selectedChoiceId?: number;
+      textAnswer?: string;
+    }>,
+  ) {
     const exam = await ExamRepository.findById(examId);
     if (!exam) {
-      const error: any = new Error('Exam not found');
+      const error: any = new Error("Exam not found");
       error.status = 404;
       throw error;
     }
 
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
       const attemptQuery = `
         INSERT INTO exam_attempts (user_id, exam_id, status)
@@ -144,8 +174,8 @@ export class ExamService {
 
           if (selectedChoiceId) {
             const choiceCheck = await client.query(
-              'SELECT is_correct FROM choices WHERE id = $1',
-              [selectedChoiceId]
+              "SELECT is_correct FROM choices WHERE id = $1",
+              [selectedChoiceId],
             );
             if (choiceCheck.rows.length > 0) {
               isCorrect = choiceCheck.rows[0].is_correct;
@@ -158,21 +188,27 @@ export class ExamService {
           await client.query(
             `INSERT INTO student_answers (attempt_id, question_id, selected_choice_id, text_answer, is_correct, points_awarded)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [attemptId, questionId, selectedChoiceId || null, textAnswer || null, isCorrect, pointsAwarded]
+            [
+              attemptId,
+              questionId,
+              selectedChoiceId || null,
+              textAnswer || null,
+              isCorrect,
+              pointsAwarded,
+            ],
           );
         }
       }
 
-      await client.query(
-        'UPDATE exam_attempts SET score = $1 WHERE id = $2',
-        [totalScore, attemptId]
-      );
+      await client.query("UPDATE exam_attempts SET score = $1 WHERE id = $2", [
+        totalScore,
+        attemptId,
+      ]);
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
       return { attemptId, score: totalScore };
-
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       throw error;
     } finally {
       client.release();

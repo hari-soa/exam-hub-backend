@@ -1,7 +1,5 @@
--- 1. Activation de l'extension pgcrypto pour le hachage sécurisé
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 2. Nettoyage de la base de données
 DROP TABLE IF EXISTS answers CASCADE;
 DROP TABLE IF EXISTS attempt_answers CASCADE;
 DROP TABLE IF EXISTS attempts CASCADE;
@@ -11,7 +9,6 @@ DROP TABLE IF EXISTS exams CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- 3. Structure des tables
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -71,7 +68,6 @@ CREATE TABLE answers (
     CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)
 );
 
--- 4. Données de test : Utilisateurs (Admin + Étudiants)
 INSERT INTO users (name, email, password, role, is_active)
 VALUES 
     ('Administrateur', 'admin@examhub.local', crypt('admin123', gen_salt('bf', 10)), 'admin', true),
@@ -79,25 +75,21 @@ VALUES
     ('Marie Curie', 'marie.curie@examhub.local', crypt('student123', gen_salt('bf', 10)), 'student', true)
 ON CONFLICT (email) DO NOTHING;
 
--- 5. Données de test : Cours
 INSERT INTO courses (code, name, description) VALUES
     ('MATH101', 'Mathématiques Appliquées', 'Calcul matriciel, probabilités et algèbre linéaire'),
     ('DEV202', 'Développement Web Fullstack', 'Introduction à Node.js, Express, React et PostgreSQL'),
     ('SEC303', 'Sécurité Informatique', 'Notions fondamentales de cryptographie, JWT et sécurité des API')
 ON CONFLICT (code) DO NOTHING;
 
--- 6. Données de test : Examens
 INSERT INTO exams (course_id, title, description, starts_at, ends_at) VALUES
     ((SELECT id FROM courses WHERE code = 'MATH101'), 'Examen Final - Algèbre', 'Évaluation de fin de semestre sur les matrices', NOW() - INTERVAL '1 day', NOW() + INTERVAL '7 days'),
     ((SELECT id FROM courses WHERE code = 'DEV202'), 'Quiz Express - Node.js & REST API', 'Test rapide sur la création de serveurs Express', NOW() - INTERVAL '2 hours', NOW() + INTERVAL '24 hours'),
     ((SELECT id FROM courses WHERE code = 'SEC303'), 'Évaluation Sécurité & JWT', 'QCM sur l authentification basée sur les jetons', NOW() - INTERVAL '5 days', NOW() - INTERVAL '1 day');
 
--- 7. Données de test : Questions
 INSERT INTO questions (exam_id, statement, points, position) VALUES
     ((SELECT id FROM exams WHERE title = 'Quiz Express - Node.js & REST API'), 'Quel statut HTTP signale une erreur d authentification (Non autorisé) ?', 2, 1),
     ((SELECT id FROM exams WHERE title = 'Quiz Express - Node.js & REST API'), 'Quelle méthode HTTP est utilisée pour mettre à jour une ressource existante ?', 2, 2);
 
--- 8. Données de test : Choix de réponses
 INSERT INTO choices (question_id, text, is_correct) VALUES
     ((SELECT id FROM questions WHERE statement LIKE 'Quel statut HTTP%'), '200 OK', false),
     ((SELECT id FROM questions WHERE statement LIKE 'Quel statut HTTP%'), '401 Unauthorized', true),

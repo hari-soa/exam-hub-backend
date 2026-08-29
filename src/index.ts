@@ -6,7 +6,7 @@ import adminRoutes from "./routes/adminRoutes";
 import myRoutes from "./routes/myRoutes";
 import studentRoutes from "./routes/studentRoutes";
 import courseRoutes from "./routes/courseRoutes";
-import examRoutes from "./routes/examRoutes"; // 👈 1. Import du routeur des examens
+import examRoutes from "./routes/examRoutes";
 import { errorHandler, notFoundHandler } from "./security/errorHandler";
 
 dotenv.config();
@@ -20,7 +20,6 @@ if (!PORT || isNaN(PORT)) {
 
 app.use(express.json());
 
-// 🛡️ SÉCURITÉ : Intercepte les erreurs de body-parser (JSON invalide / Token brut)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (err instanceof SyntaxError && "body" in err) {
     console.error("❌ Erreur de parsing JSON : Format de requête invalide.");
@@ -35,15 +34,12 @@ app.get("/", (_req: Request, res: Response) => {
   res.send("Exam Hub API running.");
 });
 
-// Enregistrement des routes de l'API
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/student", myRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/courses", courseRoutes);
-app.use("/api/exams", examRoutes); // 👈 2. Montage sur /api/exams
-
-// Middlewares d'erreur (Toujours en dernier)
+app.use("/api/exams", examRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 

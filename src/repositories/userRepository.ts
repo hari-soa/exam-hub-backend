@@ -1,5 +1,4 @@
-// src/repositories/userRepository.ts
-import { pool } from '../config/database';
+import { pool } from "../config/database";
 
 export class UserRepository {
   static async findAllStudents() {
@@ -24,29 +23,53 @@ export class UserRepository {
   }
 
   static async findByEmail(email: string) {
-    const query = 'SELECT * FROM users WHERE email = $1';
+    const query = "SELECT * FROM users WHERE email = $1";
     const result = await pool.query(query, [email]);
     return result.rows[0];
   }
 
-  static async createStudent(firstName: string, lastName: string, email: string, matricule: string, hashedPassword: string) {
+  static async createStudent(
+    firstName: string,
+    lastName: string,
+    email: string,
+    matricule: string,
+    hashedPassword: string,
+  ) {
     const query = `
       INSERT INTO users (first_name, last_name, email, matricule, password, role, is_active)
       VALUES ($1, $2, $3, $4, $5, 'student', true)
       RETURNING id, first_name, last_name, email, matricule, role, is_active, created_at
     `;
-    const result = await pool.query(query, [firstName, lastName, email, matricule, hashedPassword]);
+    const result = await pool.query(query, [
+      firstName,
+      lastName,
+      email,
+      matricule,
+      hashedPassword,
+    ]);
     return result.rows[0];
   }
 
-  static async updateStudent(id: number, firstName: string, lastName: string, email: string, matricule: string) {
+  static async updateStudent(
+    id: number,
+    firstName: string,
+    lastName: string,
+    email: string,
+    matricule: string,
+  ) {
     const query = `
       UPDATE users 
       SET first_name = $1, last_name = $2, email = $3, matricule = $4 
       WHERE id = $5 AND role = 'student'
       RETURNING id, first_name, last_name, email, matricule, role, is_active, created_at
     `;
-    const result = await pool.query(query, [firstName, lastName, email, matricule, id]);
+    const result = await pool.query(query, [
+      firstName,
+      lastName,
+      email,
+      matricule,
+      id,
+    ]);
     return result.rows[0];
   }
 

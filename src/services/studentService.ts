@@ -1,10 +1,6 @@
-// src/services/studentService.ts
-import { pool } from '../config/database';
+import { pool } from "../config/database";
 
 export class StudentService {
-  /**
-   * Récupère la liste de tous les étudiants
-   */
   static async getAllStudents() {
     const query = `
       SELECT id, name, email, role, is_active, created_at 
@@ -16,13 +12,14 @@ export class StudentService {
     return result.rows;
   }
 
-  /**
-   * Crée un nouvel étudiant
-   */
-  static async createStudent(data: { name: string; email: string; password?: string }) {
+  static async createStudent(data: {
+    name: string;
+    email: string;
+    password?: string;
+  }) {
     const { name, email, password } = data;
-    const defaultPassword = password || 'student123'; // Mot de passe par défaut si non fourni
-    
+    const defaultPassword = password || "student123";
+
     const query = `
       INSERT INTO users (name, email, password, role, is_active)
       VALUES ($1, $2, $3, 'student', true)
@@ -32,10 +29,10 @@ export class StudentService {
     return result.rows[0];
   }
 
-  /**
-   * Met à jour les informations d'un étudiant
-   */
-  static async updateStudent(id: number, data: { name?: string; email?: string; is_active?: boolean }) {
+  static async updateStudent(
+    id: number,
+    data: { name?: string; email?: string; is_active?: boolean },
+  ) {
     const { name, email, is_active } = data;
     const query = `
       UPDATE users 
@@ -50,9 +47,6 @@ export class StudentService {
     return result.rows[0];
   }
 
-  /**
-   * Réinitialise le mot de passe d'un étudiant
-   */
   static async resetPassword(id: number, password: string) {
     const query = `
       UPDATE users 
@@ -64,9 +58,6 @@ export class StudentService {
     return result.rows[0];
   }
 
-  /**
-   * Désactive ou supprime un étudiant
-   */
   static async deactivateStudent(id: number) {
     const query = `
       UPDATE users 

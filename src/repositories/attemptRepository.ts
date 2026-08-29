@@ -1,29 +1,55 @@
-// src/repositories/attemptRepository.ts
-import { pool } from '../config/database';
+import { pool } from "../config/database";
 
 export class AttemptRepository {
   static async findAttempt(studentId: number, examId: number) {
-    const query = 'SELECT * FROM exam_attempts WHERE student_id = $1 AND exam_id = $2';
+    const query =
+      "SELECT * FROM exam_attempts WHERE student_id = $1 AND exam_id = $2";
     const result = await pool.query(query, [studentId, examId]);
     return result.rows[0];
   }
 
-  static async createAttempt(studentId: number, examId: number, rawScore: number, finalScore: number, tabSwitchCount: number, penalty: number) {
+  static async createAttempt(
+    studentId: number,
+    examId: number,
+    rawScore: number,
+    finalScore: number,
+    tabSwitchCount: number,
+    penalty: number,
+  ) {
     const query = `
       INSERT INTO exam_attempts (student_id, exam_id, raw_score, final_score_over_20, tab_switch_count, penalty_points, is_submitted)
       VALUES ($1, $2, $3, $4, $5, $6, true)
       RETURNING *
     `;
-    const result = await pool.query(query, [studentId, examId, rawScore, finalScore, tabSwitchCount, penalty]);
+    const result = await pool.query(query, [
+      studentId,
+      examId,
+      rawScore,
+      finalScore,
+      tabSwitchCount,
+      penalty,
+    ]);
     return result.rows[0];
   }
 
-  static async createStudentAnswer(attemptId: number, questionId: number, selectedChoiceId: number | null, isCorrect: boolean, pointsAwarded: number) {
+  static async createStudentAnswer(
+    attemptId: number,
+    questionId: number,
+    selectedChoiceId: number | null,
+    isCorrect: boolean,
+    pointsAwarded: number,
+  ) {
     const query = `
       INSERT INTO student_answers (attempt_id, question_id, selected_choice_id, is_correct, points_awarded)
       VALUES ($1, $2, $3, $4, $5)
     `;
-    await pool.query(query, [attemptId, questionId, selectedChoiceId, isCorrect, pointsAwarded]);
+    await pool.query(query, [
+      attemptId,
+      questionId,
+      selectedChoiceId,
+      isCorrect,
+      pointsAwarded,
+    ]);
   }
 
   static async findStudentResults(studentId: number) {

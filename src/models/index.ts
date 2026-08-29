@@ -1,12 +1,9 @@
-// ==========================================
-// 1. UTILISATEURS & ÉTUDIANTS
-// ==========================================
 export interface User {
   id: number;
   name: string;
   email: string;
   password?: string;
-  role: 'admin' | 'student';
+  role: "admin" | "student";
   is_active: boolean;
   created_at?: string | Date;
 }
@@ -19,9 +16,6 @@ export interface StudentResponse {
   created_at: string;
 }
 
-// ==========================================
-// 2. COURS
-// ==========================================
 export interface Course {
   id: number;
   code: string;
@@ -30,9 +24,6 @@ export interface Course {
   exam_count?: number;
 }
 
-// ==========================================
-// 3. EXAMENS
-// ==========================================
 export interface ExamInput {
   course_id: number;
   title: string;
@@ -72,9 +63,6 @@ export interface ExamResultResponse {
   }[];
 }
 
-// ==========================================
-// 4. QUESTIONS & CHOIX
-// ==========================================
 export interface ChoiceInput {
   text: string;
   is_correct: boolean;
@@ -102,9 +90,6 @@ export interface QuestionResponse {
   choices: ChoiceResponse[];
 }
 
-// ==========================================
-// 5. TENTATIVES & RÉSULTATS (ATTEMPTS)
-// ==========================================
 export interface SubmitAnswerInput {
   question_id: number;
   choice_id: number;

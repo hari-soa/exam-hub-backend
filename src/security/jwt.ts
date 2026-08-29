@@ -1,13 +1,14 @@
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt, { SignOptions } from "jsonwebtoken";
 
 export interface JwtPayload {
   id: number;
-  role: 'admin' | 'student';
+  role: "admin" | "student";
   email: string;
 }
 
-const JWT_SECRET: string = process.env.JWT_SECRET || 'votre_secret_key';
-const JWT_EXPIRES_IN: SignOptions['expiresIn'] = (process.env.JWT_EXPIRES_IN as SignOptions['expiresIn']) || '24h';
+const JWT_SECRET: string = process.env.JWT_SECRET!;
+const JWT_EXPIRES_IN: SignOptions["expiresIn"] = process.env
+  .JWT_EXPIRES_IN as SignOptions["expiresIn"];
 
 export const generateToken = (payload: JwtPayload): string => {
   const options: SignOptions = { expiresIn: JWT_EXPIRES_IN };

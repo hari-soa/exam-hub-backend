@@ -1,5 +1,4 @@
-// src/repositories/examRepository.ts
-import { pool } from '../config/database';
+import { pool } from "../config/database";
 
 export class ExamRepository {
   static async findAll() {
@@ -24,35 +23,65 @@ export class ExamRepository {
     return result.rows[0];
   }
 
-  static async create(courseId: number, title: string, description: string, startTime: string, endTime: string, durationMinutes: number) {
+  static async create(
+    courseId: number,
+    title: string,
+    description: string,
+    startTime: string,
+    endTime: string,
+    durationMinutes: number,
+  ) {
     const query = `
       INSERT INTO exams (course_id, title, description, start_time, end_time, duration_minutes)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
-    const result = await pool.query(query, [courseId, title, description, startTime, endTime, durationMinutes]);
+    const result = await pool.query(query, [
+      courseId,
+      title,
+      description,
+      startTime,
+      endTime,
+      durationMinutes,
+    ]);
     return result.rows[0];
   }
 
-  static async update(id: number, courseId: number, title: string, description: string, startTime: string, endTime: string, durationMinutes: number) {
+  static async update(
+    id: number,
+    courseId: number,
+    title: string,
+    description: string,
+    startTime: string,
+    endTime: string,
+    durationMinutes: number,
+  ) {
     const query = `
       UPDATE exams 
       SET course_id = $1, title = $2, description = $3, start_time = $4, end_time = $5, duration_minutes = $6
       WHERE id = $7
       RETURNING *
     `;
-    const result = await pool.query(query, [courseId, title, description, startTime, endTime, durationMinutes, id]);
+    const result = await pool.query(query, [
+      courseId,
+      title,
+      description,
+      startTime,
+      endTime,
+      durationMinutes,
+      id,
+    ]);
     return result.rows[0];
   }
 
   static async delete(id: number) {
-    const query = 'DELETE FROM exams WHERE id = $1 RETURNING id';
+    const query = "DELETE FROM exams WHERE id = $1 RETURNING id";
     const result = await pool.query(query, [id]);
     return result.rows[0];
   }
 
   static async hasAttempts(examId: number) {
-    const query = 'SELECT COUNT(*) FROM exam_attempts WHERE exam_id = $1';
+    const query = "SELECT COUNT(*) FROM exam_attempts WHERE exam_id = $1";
     const result = await pool.query(query, [examId]);
     return parseInt(result.rows[0].count, 10) > 0;
   }
