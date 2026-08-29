@@ -1,81 +1,70 @@
-DROP TABLE IF EXISTS student_answers CASCADE;
-DROP TABLE IF EXISTS exam_attempts CASCADE;
+DROP TABLE IF EXISTS attempt_answers CASCADE;
+DROP TABLE IF EXISTS attempts CASCADE;
 DROP TABLE IF EXISTS choices CASCADE;
 DROP TABLE IF EXISTS questions CASCADE;
 DROP TABLE IF EXISTS exams CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
-CREATE TYPE user_role AS ENUM ('admin', 'student');
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    email VARCHAR(150) UNIQUE NOT NULL,
-    matricule VARCHAR(50) UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role user_role NOT NULL DEFAULT 'student',
-    is_active BOOLEAN NOT NULL DEFAULT true,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'student')),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE courses (
     id SERIAL PRIMARY KEY,
-    code VARCHAR(20) UNIQUE NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    professor_name VARCHAR(100),
-    credits INT NOT NULL DEFAULT 4,
-    semester VARCHAR(20) DEFAULT 'Semester 1',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT
 );
 
 CREATE TABLE exams (
     id SERIAL PRIMARY KEY,
-    course_id INT NOT NULL REFERENCES courses(id) ON DELETE RESTRICT,
-    title VARCHAR(150) NOT NULL,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE RESTRICT,
+    title VARCHAR(255) NOT NULL,
     description TEXT,
-    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    duration_minutes INT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT check_exam_dates CHECK (ends_at > starts_at)
 );
 
 CREATE TABLE questions (
     id SERIAL PRIMARY KEY,
-    exam_id INT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
-    question_text TEXT NOT NULL,
-    points DECIMAL(5, 2) NOT NULL DEFAULT 1.00,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    statement TEXT NOT NULL,
+    points INTEGER NOT NULL DEFAULT 1 CHECK (points >= 1),
+    position INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE choices (
     id SERIAL PRIMARY KEY,
-    question_id INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    choice_text TEXT NOT NULL,
-    is_correct BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    is_correct BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE TABLE exam_attempts (
+CREATE TABLE attempts (
     id SERIAL PRIMARY KEY,
-    exam_id INT NOT NULL REFERENCES exams(id) ON DELETE RESTRICT,
-    student_id INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE RESTRICT,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    score INTEGER NOT NULL,
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    tab_switch_count INT NOT NULL DEFAULT 0,
-    penalty_points DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
-    raw_score DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
-    final_score_over_20 DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
-    is_submitted BOOLEAN NOT NULL DEFAULT true,
     CONSTRAINT unique_student_exam_attempt UNIQUE (exam_id, student_id)
 );
 
-CREATE TABLE student_answers (
+CREATE TABLE attempt_answers (
     id SERIAL PRIMARY KEY,
-    attempt_id INT NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
-    question_id INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    selected_choice_id INT REFERENCES choices(id) ON DELETE SET NULL,
-    is_correct BOOLEAN NOT NULL DEFAULT false,
-    points_awarded DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    attempt_id INTEGER NOT NULL REFERENCES attempts(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    choice_id INTEGER NOT NULL REFERENCES choices(id) ON DELETE CASCADE,
     CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)
 );
+
+INSERT INTO users (name, email, password, role, is_active)
+VALUES ('Administrateur', 'admin@examhub.local', '$2b$10$Wb/4q9H0kE9.M7WvXkX9ue0v8S78pG3X5yvE4u4/y9Z4/Z4vV', 'admin', true)
+ON CONFLICT (email) DO NOTHING;

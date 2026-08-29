@@ -1,206 +1,217 @@
-import { pool } from "../config/database";
 import { ExamRepository } from "../repositories/examRepository";
 import { QuestionRepository } from "../repositories/questionRepository";
-import { ChoiceRepository } from "../repositories/choiceRepository";
-import { AttemptRepository } from "../repositories/attemptRepository";
-import { Exam, Question, Choice } from "../models/examModel";
-import { ApiError } from "../utils/ApiError";
+import { pool } from "../config/database";
 
-const questionRepo = QuestionRepository as any;
-
-export const ExamService = {
-  async getAvailableExamsForStudent(_studentId: number): Promise<Exam[]> {
-    const now = new Date();
-    const exams = await ExamRepository.findAll();
-    return exams.filter((exam: any) => {
-      const start = new Date(exam.starts_at || exam.start_time);
-      const end = new Date(exam.ends_at || exam.end_time);
-      return now >= start && now <= end;
-    });
-  },
-
-  async getExamForStudent(examId: number): Promise<Exam> {
-    const exam = await ExamRepository.findByIdWithQuestions(examId);
-    if (!exam) throw ApiError.notFound("Exam not found.");
-
-    const now = new Date();
-    const start = new Date(exam.starts_at || exam.start_time);
-    const end = new Date(exam.ends_at || exam.end_time);
-    if (now < start || now > end) {
-      throw ApiError.forbidden("This exam is not available at the moment.");
-    }
-    if (exam.questions) {
-      exam.questions.forEach((q: any) => {
-        if (q.choices) {
-          q.choices.forEach((c: any) => {
-            delete c.is_correct;
-          });
-        }
-      });
-    }
-    return exam;
-  },
-
-  async getAllExams(): Promise<Exam[]> {
+export class ExamService {
+  static async getAllExams() {
     return await ExamRepository.findAll();
-  },
+  }
 
-  async getExamById(id: number): Promise<Exam> {
-    const exam = await ExamRepository.findByIdWithQuestions(id);
-    if (!exam) throw ApiError.notFound("Exam not found");
-    return exam;
-  },
+  static async getExamsHistory() {
+    if (typeof (ExamRepository as any).findHistory === "function") {
+      return await (ExamRepository as any).findHistory();
+    }
+    return await ExamRepository.findAll();
+  }
 
-  async createExam(data: {
+  static async getExamById(id: number) {
+    const exam = await ExamRepository.findById(id);
+    if (!exam) {
+      const error: any = new Error("Exam not found");
+      error.status = 404;
+      throw error;
+    }
+    const questions = await QuestionRepository.findByExamId(id, true);
+    return { ...exam, questions };
+  }
+
+  static async createExam(data: {
     course_id: number;
     title: string;
     description?: string;
-    starts_at: string;
-    ends_at: string;
-  }): Promise<Exam> {
-    if (!data.course_id || !data.title || !data.starts_at || !data.ends_at) {
-      throw ApiError.badRequest("Incomplete exam data");
-    }
-    return await ExamRepository.create(data);
-  },
+    start_time: string;
+    end_time: string;
+    duration_minutes: number;
+  }) {
+    return await ExamRepository.create(
+      data.course_id,
+      data.title,
+      data.description || "",
+      data.start_time,
+      data.end_time,
+      data.duration_minutes,
+    );
+  }
 
-  async updateExam(id: number, data: Partial<Exam>): Promise<Exam> {
+  static async updateExam(
+    id: number,
+    data: {
+      course_id: number;
+      title: string;
+      description?: string;
+      start_time: string;
+      end_time: string;
+      duration_minutes: number;
+    },
+  ) {
     const exam = await ExamRepository.findById(id);
-    if (!exam) throw ApiError.notFound("Exam not found");
-
-    const attempts = await AttemptRepository.findByExamId(id);
-    if (attempts.length > 0) {
-      throw ApiError.conflict(
-        "Cannot update an exam that already has student attempts.",
-      );
+    if (!exam) {
+      const error: any = new Error("Exam not found");
+      error.status = 404;
+      throw error;
     }
 
-    return await ExamRepository.update(id, data);
-  },
+    const hasAttempts = await ExamRepository.hasAttempts(id);
+    if (hasAttempts) {
+      const error: any = new Error(
+        "Cannot modify exam because it has attempts (RG-08)",
+      );
+      error.status = 409;
+      throw error;
+    }
 
-  async deleteExam(id: number): Promise<void> {
+    return await ExamRepository.update(
+      id,
+      data.course_id,
+      data.title,
+      data.description || "",
+      data.start_time,
+      data.end_time,
+      data.duration_minutes,
+    );
+  }
+
+  static async deleteExam(id: number) {
     const exam = await ExamRepository.findById(id);
-    if (!exam) throw ApiError.notFound("Exam not found");
-
-    const attempts = await AttemptRepository.findByExamId(id);
-    if (attempts.length > 0) {
-      throw ApiError.conflict(
-        "Cannot delete an exam that has existing student attempts.",
-      );
+    if (!exam) {
+      const error: any = new Error("Exam not found");
+      error.status = 404;
+      throw error;
     }
 
-    await ExamRepository.delete(id);
-  },
+    const hasAttempts = await ExamRepository.hasAttempts(id);
+    if (hasAttempts) {
+      const error: any = new Error(
+        "Cannot delete exam because it has attempts (RG-09)",
+      );
+      error.status = 409;
+      throw error;
+    }
 
-  async getExamResults(examId: number) {
+    try {
+      return await ExamRepository.delete(id);
+    } catch (error: any) {
+      if (error.code === "23503") {
+        const customError: any = new Error(
+          "Cannot delete exam due to existing dependencies (RG-09)",
+        );
+        customError.status = 409;
+        throw customError;
+      }
+      throw error;
+    }
+  }
+
+  static async getExamResults(examId: number) {
     const exam = await ExamRepository.findById(examId);
-    if (!exam) throw ApiError.notFound("Exam not found");
+    if (!exam) {
+      const error: any = new Error("Exam not found");
+      error.status = 404;
+      throw error;
+    }
 
-    const attempts = await AttemptRepository.findByExamId(examId);
-    const totalAttempts = attempts.length;
-
-    const averageScore =
-      totalAttempts > 0
-        ? attempts.reduce(
-            (acc: number, curr: any) => acc + Number(curr.final_score_over_20),
-            0,
-          ) / totalAttempts
-        : 0;
+    const attempts = await ExamRepository.getExamResults(examId);
+    let totalScore = 0;
+    attempts.forEach(
+      (a: any) => (totalScore += parseFloat(a.final_score_over_20)),
+    );
+    const average = attempts.length > 0 ? totalScore / attempts.length : 0;
 
     return {
-      exam_id: examId,
-      total_attempts: totalAttempts,
-      average_score: Math.round(averageScore * 100) / 100,
+      exam,
+      attempts_count: attempts.length,
+      average_score: parseFloat(average.toFixed(2)),
       attempts,
     };
-  },
+  }
 
-  async addQuestionToExam(
+  static async submitExam(
+    userId: number,
     examId: number,
-    data: { question_text: string; points: number; choices: Choice[] },
-  ): Promise<Question> {
-    const attempts = await AttemptRepository.findByExamId(examId);
-    if (attempts.length > 0) {
-      throw ApiError.conflict(
-        "Cannot add a question: this exam already has student attempts.",
-      );
-    }
-
-    if (!data.choices || data.choices.length < 2 || data.choices.length > 6) {
-      throw ApiError.badRequest(
-        "A question must have between 2 and 6 choices.",
-      );
-    }
-
-    const correctChoicesCount = data.choices.filter((c) => c.is_correct).length;
-    if (correctChoicesCount !== 1) {
-      throw ApiError.badRequest(
-        "A question must have exactly one correct choice.",
-      );
+    answers: Array<{
+      questionId: number;
+      selectedChoiceId?: number;
+      textAnswer?: string;
+    }>,
+  ) {
+    const exam = await ExamRepository.findById(examId);
+    if (!exam) {
+      const error: any = new Error("Exam not found");
+      error.status = 404;
+      throw error;
     }
 
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      const question = await questionRepo.create(
-        {
-          exam_id: examId,
-          question_text: data.question_text,
-          points: data.points,
-        },
-        client,
-      );
-      for (const choice of data.choices) {
-        await ChoiceRepository.create(
-          question.id,
-          choice.choice_text,
-          Boolean(choice.is_correct),
-          client,
-        );
+      const attemptQuery = `
+        INSERT INTO exam_attempts (user_id, exam_id, status)
+        VALUES ($1, $2, 'soumis')
+        RETURNING id;
+      `;
+      const attemptResult = await client.query(attemptQuery, [userId, examId]);
+      const attemptId = attemptResult.rows[0].id;
+
+      let totalScore = 0;
+
+      if (Array.isArray(answers)) {
+        for (const ans of answers) {
+          const { questionId, selectedChoiceId, textAnswer } = ans;
+
+          let isCorrect = false;
+          let pointsAwarded = 0;
+
+          if (selectedChoiceId) {
+            const choiceCheck = await client.query(
+              "SELECT is_correct FROM choices WHERE id = $1",
+              [selectedChoiceId],
+            );
+            if (choiceCheck.rows.length > 0) {
+              isCorrect = choiceCheck.rows[0].is_correct;
+              pointsAwarded = isCorrect ? 1 : 0;
+            }
+          }
+
+          totalScore += pointsAwarded;
+
+          await client.query(
+            `INSERT INTO student_answers (attempt_id, question_id, selected_choice_id, text_answer, is_correct, points_awarded)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              attemptId,
+              questionId,
+              selectedChoiceId || null,
+              textAnswer || null,
+              isCorrect,
+              pointsAwarded,
+            ],
+          );
+        }
       }
 
+      await client.query("UPDATE exam_attempts SET score = $1 WHERE id = $2", [
+        totalScore,
+        attemptId,
+      ]);
+
       await client.query("COMMIT");
-      return question;
+      return { attemptId, score: totalScore };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
     } finally {
       client.release();
     }
-  },
-
-  async updateQuestion(
-    questionId: number,
-    data: Partial<Question>,
-  ): Promise<Question> {
-    const question = await questionRepo.findById(questionId);
-    if (!question) throw ApiError.notFound("Question not found");
-
-    const attempts = await AttemptRepository.findByExamId(question.exam_id);
-    if (attempts.length > 0) {
-      throw ApiError.conflict(
-        "Cannot update a question in an exam with existing attempts.",
-      );
-    }
-
-    const updated = await questionRepo.update(questionId, data);
-    if (!updated) throw ApiError.notFound("Question not found");
-
-    return updated;
-  },
-
-  async deleteQuestion(questionId: number): Promise<void> {
-    const question = await questionRepo.findById(questionId);
-    if (!question) throw ApiError.notFound("Question not found");
-
-    const attempts = await AttemptRepository.findByExamId(question.exam_id);
-    if (attempts.length > 0) {
-      throw ApiError.conflict(
-        "Cannot delete a question in an exam with existing attempts.",
-      );
-    }
-
-    await questionRepo.delete(questionId);
-  },
-};
+  }
+}

@@ -1,138 +1,93 @@
-import { PoolClient } from "pg";
 import { pool } from "../config/database";
-import { ExamAttempt } from "../models/examModel";
 
-export interface ExamAttemptWithUser extends ExamAttempt {
-  attempt_id: number;
-  first_name: string;
-  last_name: string;
-  email: string;
-}
+export class AttemptRepository {
+  static async findAttempt(studentId: number, examId: number) {
+    const query =
+      "SELECT * FROM exam_attempts WHERE student_id = $1 AND exam_id = $2";
+    const result = await pool.query(query, [studentId, examId]);
+    return result.rows[0];
+  }
 
-export const AttemptRepository = {
-  async findByStudentAndExam(
-    studentId: number,
-    examId: number,
-  ): Promise<ExamAttempt | null> {
-    const query = `
-      SELECT * FROM exam_attempts 
-      WHERE student_id = $1 AND exam_id = $2;
-    `;
-    const { rows } = await pool.query(query, [studentId, examId]);
-    return rows[0] || null;
-  },
-
-  async findById(attemptId: number): Promise<ExamAttempt | null> {
-    const query = `SELECT * FROM exam_attempts WHERE id = $1;`;
-    const { rows } = await pool.query(query, [attemptId]);
-    return rows[0] || null;
-  },
-
-  async findByStudentId(studentId: number): Promise<ExamAttempt[]> {
-    const query = `
-      SELECT a.*, e.title as exam_title 
-      FROM exam_attempts a
-      JOIN exams e ON a.exam_id = e.id
-      WHERE a.student_id = $1
-      ORDER BY a.submitted_at DESC;
-    `;
-    const { rows } = await pool.query(query, [studentId]);
-    return rows;
-  },
-
-  async findByExamId(examId: number): Promise<ExamAttemptWithUser[]> {
-    const query = `
-      SELECT 
-        a.id AS attempt_id,
-        a.exam_id,
-        a.student_id,
-        a.raw_score,
-        a.penalty_points,
-        a.final_score_over_20,
-        a.tab_switch_count,
-        a.submitted_at,
-        u.first_name,
-        u.last_name,
-        u.email
-      FROM exam_attempts a
-      JOIN users u ON a.student_id = u.id
-      WHERE a.exam_id = $1 AND a.is_submitted = true
-      ORDER BY a.submitted_at DESC;
-    `;
-    const { rows } = await pool.query(query, [examId]);
-    return rows;
-  },
-
-  async createAttempt(
-    data: Omit<ExamAttempt, "id" | "submitted_at">,
-    client?: PoolClient,
-  ): Promise<ExamAttempt> {
-    const dbClient = client || pool;
-    const query = `
-      INSERT INTO exam_attempts 
-        (exam_id, student_id, tab_switch_count, penalty_points, raw_score, final_score_over_20, is_submitted)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      ON CONFLICT (exam_id, student_id) 
-      DO UPDATE SET 
-        tab_switch_count = EXCLUDED.tab_switch_count,
-        penalty_points = EXCLUDED.penalty_points,
-        raw_score = EXCLUDED.raw_score,
-        final_score_over_20 = EXCLUDED.final_score_over_20,
-        is_submitted = EXCLUDED.is_submitted,
-        submitted_at = CURRENT_TIMESTAMP
-      RETURNING *;
-    `;
-    const values = [
-      data.exam_id,
-      data.student_id,
-      data.tab_switch_count,
-      data.penalty_points,
-      data.raw_score,
-      data.final_score_over_20,
-      data.is_submitted,
-    ];
-    const { rows } = await dbClient.query(query, values);
-    return rows[0];
-  },
-
-  async create(
+  static async createAttempt(
     studentId: number,
     examId: number,
     rawScore: number,
-    totalPoints: number,
-    tabSwitchCount: number = 0,
-    penaltyPoints: number = 0,
-    client?: PoolClient,
-  ): Promise<ExamAttempt> {
-    const finalScore = Math.max(
-      0,
-      (rawScore / (totalPoints || 1)) * 20 - penaltyPoints,
-    );
-    return this.createAttempt(
-      {
-        exam_id: examId,
-        student_id: studentId,
-        tab_switch_count: tabSwitchCount,
-        penalty_points: penaltyPoints,
-        raw_score: rawScore,
-        final_score_over_20: Math.round(finalScore * 100) / 100,
-        is_submitted: true,
-      },
-      client,
-    );
-  },
-
-  async incrementTabSwitch(
-    attemptId: number,
-    studentId: number,
-  ): Promise<number> {
+    finalScore: number,
+    tabSwitchCount: number,
+    penalty: number,
+  ) {
     const query = `
-      UPDATE exam_attempts 
-      SET tab_switch_count = tab_switch_count + 1 
-      WHERE id = $1 AND student_id = $2 AND is_submitted = false
-      RETURNING tab_switch_count;
+      INSERT INTO exam_attempts (student_id, exam_id, raw_score, final_score_over_20, tab_switch_count, penalty_points, is_submitted)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
+      RETURNING *
     `;
-    const { rows } = await pool.query(query, [attemptId, studentId]);
-    return rows[0] ? rows[0].tab_switch_count : 0;
-  },
-};
+    const result = await pool.query(query, [
+      studentId,
+      examId,
+      rawScore,
+      finalScore,
+      tabSwitchCount,
+      penalty,
+    ]);
+    return result.rows[0];
+  }
+
+  static async createStudentAnswer(
+    attemptId: number,
+    questionId: number,
+    selectedChoiceId: number | null,
+    isCorrect: boolean,
+    pointsAwarded: number,
+  ) {
+    const query = `
+      INSERT INTO student_answers (attempt_id, question_id, selected_choice_id, is_correct, points_awarded)
+      VALUES ($1, $2, $3, $4, $5)
+    `;
+    await pool.query(query, [
+      attemptId,
+      questionId,
+      selectedChoiceId,
+      isCorrect,
+      pointsAwarded,
+    ]);
+  }
+
+  static async findStudentResults(studentId: number) {
+    const query = `
+      SELECT ea.*, e.title as exam_title, c.name as course_name, c.code as course_code
+      FROM exam_attempts ea
+      JOIN exams e ON ea.exam_id = e.id
+      JOIN courses c ON e.course_id = c.id
+      WHERE ea.student_id = $1
+      ORDER BY ea.submitted_at DESC
+    `;
+    const result = await pool.query(query, [studentId]);
+    return result.rows;
+  }
+
+  static async findAttemptDetails(attemptId: number, studentId: number) {
+    const query = `
+      SELECT ea.*, e.title as exam_title, e.description as exam_description
+      FROM exam_attempts ea
+      JOIN exams e ON ea.exam_id = e.id
+      WHERE ea.id = $1 AND ea.student_id = $2
+    `;
+    const result = await pool.query(query, [attemptId, studentId]);
+    return result.rows[0];
+  }
+
+  static async findAnswersWithCorrection(attemptId: number) {
+    const query = `
+      SELECT sa.*, q.question_text, q.points as max_points, 
+             sc.choice_text as selected_choice_text,
+             cc.id as correct_choice_id, cc.choice_text as correct_choice_text
+      FROM student_answers sa
+      JOIN questions q ON sa.question_id = q.id
+      LEFT JOIN choices sc ON sa.selected_choice_id = sc.id
+      JOIN choices cc ON q.id = cc.question_id AND cc.is_correct = true
+      WHERE sa.attempt_id = $1
+    `;
+    const result = await pool.query(query, [attemptId]);
+    return result.rows;
+  }
+}
