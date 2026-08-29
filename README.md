@@ -50,7 +50,7 @@ Getting Started
 1. Clone the Repository
 
 ```bash
-git clone [[https://github.com/YOUR_USERNAME/exam-hub-backend.git](https://github.com/hari-soa/exam-hub-backend.git)])
+git clone https://github.com/hari-soa/exam-hub-backend.git
 cd exam-hub-backend
 ```
 
